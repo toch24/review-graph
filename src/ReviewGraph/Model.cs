@@ -29,7 +29,8 @@ public sealed record NodeOut(
     int Dels,
     int Layer,
     int Order,
-    List<LineOut> Lines);
+    List<LineOut> Lines,
+    string? Project = null);   // owning project (csproj) name; the viewer groups cards by it
 
 /// <param name="T">"+" added, "-" removed, " " unchanged, "…" folded run of unchanged lines</param>
 /// <param name="Id">Anchor id ("L42") when an edge starts or ends on this row</param>

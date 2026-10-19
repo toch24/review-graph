@@ -16,7 +16,7 @@
   },
   "overview": [
     "20 changed units across 8 files, told in 6 steps.",
-    "Entry points involved: \u0060HTTP GET /api/Cart/{userId}/total\u0060, \u0060HTTP POST /api/Checkout\u0060 and \u0060Program start\u0060.",
+    "Entry points involved: `HTTP GET /api/Cart/{userId}/total`, `HTTP POST /api/Checkout` and `Program start`.",
     "Colored cards are code this PR changes. Gray cards are unchanged code, included because the change calls into it or is called from it."
   ],
   "nodes": [
@@ -38,12 +38,12 @@
         {
           "n": 20,
           "t": " ",
-          "c": "[HttpGet(\u0022{userId}/total\u0022)]"
+          "c": "[HttpGet(\"{userId}/total\")]"
         },
         {
           "n": 21,
           "t": " ",
-          "c": "public async Task\u003CActionResult\u003Cdecimal\u003E\u003E GetTotal(string userId)"
+          "c": "public async Task<ActionResult<decimal>> GetTotal(string userId)"
         },
         {
           "n": 22,
@@ -66,7 +66,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "checkoutcontroller-checkout",
@@ -91,7 +92,7 @@
         {
           "n": 16,
           "t": " ",
-          "c": "public async Task\u003CActionResult\u003COrder\u003E\u003E Checkout([FromBody] CheckoutRequest request)"
+          "c": "public async Task<ActionResult<Order>> Checkout([FromBody] CheckoutRequest request)"
         },
         {
           "n": 17,
@@ -101,7 +102,7 @@
         {
           "n": 18,
           "t": " ",
-          "c": "    var userId = User.Identity?.Name ?? \u0022anonymous\u0022;"
+          "c": "    var userId = User.Identity?.Name ?? \"anonymous\";"
         },
         {
           "n": 19,
@@ -119,7 +120,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "icouponrepository-findbycodeasync",
@@ -137,11 +139,12 @@
       "lines": [
         {
           "n": 7,
-          "t": "\u002B",
-          "c": "Task\u003CCoupon?\u003E FindByCodeAsync(string code);",
+          "t": "+",
+          "c": "Task<Coupon?> FindByCodeAsync(string code);",
           "id": "L7"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "icouponrepository-incrementusesasync",
@@ -159,11 +162,12 @@
       "lines": [
         {
           "n": 8,
-          "t": "\u002B",
+          "t": "+",
           "c": "Task IncrementUsesAsync(Guid couponId);",
           "id": "L8"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "inmemorycouponrepository-bycode",
@@ -181,11 +185,12 @@
       "lines": [
         {
           "n": 13,
-          "t": "\u002B",
-          "c": "private readonly Dictionary\u003Cstring, Coupon\u003E _byCode = new(StringComparer.OrdinalIgnoreCase);",
+          "t": "+",
+          "c": "private readonly Dictionary<string, Coupon> _byCode = new(StringComparer.OrdinalIgnoreCase);",
           "id": "L13"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "inmemorycouponrepository-findbycodeasync",
@@ -203,17 +208,18 @@
       "lines": [
         {
           "n": 15,
-          "t": "\u002B",
-          "c": "public Task\u003CCoupon?\u003E FindByCodeAsync(string code) =\u003E",
+          "t": "+",
+          "c": "public Task<Coupon?> FindByCodeAsync(string code) =>",
           "id": "L15"
         },
         {
           "n": 16,
-          "t": "\u002B",
+          "t": "+",
           "c": "    Task.FromResult(_byCode.TryGetValue(code, out var c) ? c : null);",
           "id": "L16"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "inmemorycouponrepository-incrementusesasync",
@@ -231,41 +237,42 @@
       "lines": [
         {
           "n": 18,
-          "t": "\u002B",
+          "t": "+",
           "c": "public Task IncrementUsesAsync(Guid couponId)"
         },
         {
           "n": 19,
-          "t": "\u002B",
+          "t": "+",
           "c": "{"
         },
         {
           "n": 20,
-          "t": "\u002B",
-          "c": "    var match = _byCode.Values.FirstOrDefault(c =\u003E c.Id == couponId);",
+          "t": "+",
+          "c": "    var match = _byCode.Values.FirstOrDefault(c => c.Id == couponId);",
           "id": "L20"
         },
         {
           "n": 21,
-          "t": "\u002B",
+          "t": "+",
           "c": "    if (match is not null)"
         },
         {
           "n": 22,
-          "t": "\u002B",
-          "c": "        _byCode[match.Code] = match with { Uses = match.Uses \u002B 1 };"
+          "t": "+",
+          "c": "        _byCode[match.Code] = match with { Uses = match.Uses + 1 };"
         },
         {
           "n": 23,
-          "t": "\u002B",
+          "t": "+",
           "c": "    return Task.CompletedTask;"
         },
         {
           "n": 24,
-          "t": "\u002B",
+          "t": "+",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "checkoutrequest-couponcode",
@@ -283,10 +290,11 @@
       "lines": [
         {
           "n": 6,
-          "t": "\u002B",
+          "t": "+",
           "c": "public string? CouponCode { get; set; }"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "coupon",
@@ -304,10 +312,11 @@
       "lines": [
         {
           "n": 3,
-          "t": "\u002B",
+          "t": "+",
           "c": "public record Coupon(Guid Id, string Code, int PercentOff, DateTimeOffset ExpiresAt, int Uses, int MaxUses);"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "order-couponid",
@@ -325,10 +334,11 @@
       "lines": [
         {
           "n": 8,
-          "t": "\u002B",
+          "t": "+",
           "c": "public Guid? CouponId { get; init; }"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "pricingcalculator-calculatetotal",
@@ -351,7 +361,7 @@
         },
         {
           "n": 10,
-          "t": "\u002B",
+          "t": "+",
           "c": "public decimal CalculateTotal(Cart cart, Coupon? coupon = null)",
           "id": "L10"
         },
@@ -363,27 +373,27 @@
         {
           "n": 12,
           "t": " ",
-          "c": "    var subtotal = cart.Items.Sum(i =\u003E i.Price * i.Quantity);"
+          "c": "    var subtotal = cart.Items.Sum(i => i.Price * i.Quantity);"
         },
         {
           "n": 13,
           "t": "-",
-          "c": "    return subtotal \u002B Shipping(subtotal);"
+          "c": "    return subtotal + Shipping(subtotal);"
         },
         {
           "n": 13,
-          "t": "\u002B",
+          "t": "+",
           "c": "    var discount = coupon is null ? 0m : Math.Round(subtotal * coupon.PercentOff / 100m, 2);"
         },
         {
           "n": 14,
-          "t": "\u002B",
+          "t": "+",
           "c": "    var discounted = Math.Max(0m, subtotal - discount);"
         },
         {
           "n": 15,
-          "t": "\u002B",
-          "c": "    return discounted \u002B Shipping(discounted);",
+          "t": "+",
+          "c": "    return discounted + Shipping(discounted);",
           "id": "L15"
         },
         {
@@ -391,7 +401,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "pricingcalculator-shipping",
@@ -410,14 +421,15 @@
         {
           "n": 18,
           "t": " ",
-          "c": "public decimal Shipping(decimal subtotal) =\u003E"
+          "c": "public decimal Shipping(decimal subtotal) =>"
         },
         {
           "n": 19,
           "t": " ",
-          "c": "    subtotal \u003E= FreeShippingThreshold ? 0m : FlatShipping;"
+          "c": "    subtotal >= FreeShippingThreshold ? 0m : FlatShipping;"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "program-cs-top-level",
@@ -452,39 +464,39 @@
         {
           "n": 8,
           "t": " ",
-          "c": "builder.Services.AddSingleton\u003CICartRepository, InMemoryCartRepository\u003E();"
+          "c": "builder.Services.AddSingleton<ICartRepository, InMemoryCartRepository>();"
         },
         {
           "n": 9,
           "t": " ",
-          "c": "builder.Services.AddSingleton\u003CIOrderRepository, InMemoryOrderRepository\u003E();"
+          "c": "builder.Services.AddSingleton<IOrderRepository, InMemoryOrderRepository>();"
         },
         {
           "n": 10,
           "t": " ",
-          "c": "builder.Services.AddSingleton\u003CPricingCalculator\u003E();"
+          "c": "builder.Services.AddSingleton<PricingCalculator>();"
         },
         {
           "n": 11,
-          "t": "\u002B",
-          "c": "builder.Services.AddSingleton\u003CICouponRepository, InMemoryCouponRepository\u003E();",
+          "t": "+",
+          "c": "builder.Services.AddSingleton<ICouponRepository, InMemoryCouponRepository>();",
           "id": "L11"
         },
         {
           "n": 12,
-          "t": "\u002B",
+          "t": "+",
           "c": "builder.Services.AddSingleton(TimeProvider.System);"
         },
         {
           "n": 13,
-          "t": "\u002B",
-          "c": "builder.Services.AddScoped\u003CICouponService, CouponService\u003E();",
+          "t": "+",
+          "c": "builder.Services.AddScoped<ICouponService, CouponService>();",
           "id": "L13"
         },
         {
           "n": 14,
           "t": " ",
-          "c": "builder.Services.AddScoped\u003CICheckoutService, CheckoutService\u003E();"
+          "c": "builder.Services.AddScoped<ICheckoutService, CheckoutService>();"
         },
         {
           "n": 15,
@@ -501,7 +513,8 @@
           "t": " ",
           "c": "app.Run();"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "checkoutservice-coupons",
@@ -519,10 +532,11 @@
       "lines": [
         {
           "n": 12,
-          "t": "\u002B",
+          "t": "+",
           "c": "private readonly ICouponService _coupons;"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "checkoutservice-constructor",
@@ -545,7 +559,7 @@
         },
         {
           "n": 14,
-          "t": "\u002B",
+          "t": "+",
           "c": "public CheckoutService(ICartRepository carts, IOrderRepository orders, PricingCalculator pricing, ICouponService coupons)"
         },
         {
@@ -570,7 +584,7 @@
         },
         {
           "n": 19,
-          "t": "\u002B",
+          "t": "+",
           "c": "    _coupons = coupons;",
           "id": "L19"
         },
@@ -579,7 +593,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "checkoutservice-placeorderasync",
@@ -598,7 +613,7 @@
         {
           "n": 22,
           "t": " ",
-          "c": "public async Task\u003COrder\u003E PlaceOrderAsync(string userId, CheckoutRequest request)"
+          "c": "public async Task<Order> PlaceOrderAsync(string userId, CheckoutRequest request)"
         },
         {
           "n": 23,
@@ -618,7 +633,7 @@
         {
           "n": 26,
           "t": " ",
-          "c": "        throw new InvalidOperationException(\u0022Cart is empty\u0022);"
+          "c": "        throw new InvalidOperationException(\"Cart is empty\");"
         },
         {
           "n": 27,
@@ -632,19 +647,19 @@
         },
         {
           "n": 28,
-          "t": "\u002B",
+          "t": "+",
           "c": "    Coupon? coupon = null;",
           "id": "L28"
         },
         {
           "n": 29,
-          "t": "\u002B",
+          "t": "+",
           "c": "    if (!string.IsNullOrWhiteSpace(request.CouponCode))",
           "id": "L29"
         },
         {
           "n": 30,
-          "t": "\u002B",
+          "t": "+",
           "c": "        coupon = await _coupons.ValidateAsync(request.CouponCode);",
           "id": "L30"
         },
@@ -655,7 +670,7 @@
         },
         {
           "n": 32,
-          "t": "\u002B",
+          "t": "+",
           "c": "    var total = _pricing.CalculateTotal(cart, coupon);",
           "id": "L32"
         },
@@ -681,7 +696,7 @@
         },
         {
           "n": 37,
-          "t": "\u002B",
+          "t": "+",
           "c": "        CouponId = coupon?.Id,",
           "id": "L37"
         },
@@ -702,12 +717,12 @@
         },
         {
           "n": 41,
-          "t": "\u002B",
+          "t": "+",
           "c": "    if (coupon is not null)"
         },
         {
           "n": 42,
-          "t": "\u002B",
+          "t": "+",
           "c": "        _coupons.RecordUseAsync(coupon.Id);",
           "id": "L42"
         },
@@ -731,7 +746,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "icouponservice-validateasync",
@@ -749,11 +765,12 @@
       "lines": [
         {
           "n": 8,
-          "t": "\u002B",
-          "c": "Task\u003CCoupon\u003E ValidateAsync(string code);",
+          "t": "+",
+          "c": "Task<Coupon> ValidateAsync(string code);",
           "id": "L8"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "icouponservice-recorduseasync",
@@ -771,11 +788,12 @@
       "lines": [
         {
           "n": 9,
-          "t": "\u002B",
+          "t": "+",
           "c": "Task RecordUseAsync(Guid couponId);",
           "id": "L9"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "couponservice-coupons",
@@ -793,10 +811,11 @@
       "lines": [
         {
           "n": 14,
-          "t": "\u002B",
+          "t": "+",
           "c": "private readonly ICouponRepository _coupons;"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "couponservice-clock",
@@ -814,10 +833,11 @@
       "lines": [
         {
           "n": 15,
-          "t": "\u002B",
+          "t": "+",
           "c": "private readonly TimeProvider _clock;"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "couponservice-constructor",
@@ -835,32 +855,33 @@
       "lines": [
         {
           "n": 17,
-          "t": "\u002B",
+          "t": "+",
           "c": "public CouponService(ICouponRepository coupons, TimeProvider clock)"
         },
         {
           "n": 18,
-          "t": "\u002B",
+          "t": "+",
           "c": "{"
         },
         {
           "n": 19,
-          "t": "\u002B",
+          "t": "+",
           "c": "    _coupons = coupons;",
           "id": "L19"
         },
         {
           "n": 20,
-          "t": "\u002B",
+          "t": "+",
           "c": "    _clock = clock;",
           "id": "L20"
         },
         {
           "n": 21,
-          "t": "\u002B",
+          "t": "+",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "couponservice-validateasync",
@@ -878,25 +899,25 @@
       "lines": [
         {
           "n": 23,
-          "t": "\u002B",
-          "c": "public async Task\u003CCoupon\u003E ValidateAsync(string code)",
+          "t": "+",
+          "c": "public async Task<Coupon> ValidateAsync(string code)",
           "id": "L23"
         },
         {
           "n": 24,
-          "t": "\u002B",
+          "t": "+",
           "c": "{"
         },
         {
           "n": 25,
-          "t": "\u002B",
+          "t": "+",
           "c": "    var coupon = await _coupons.FindByCodeAsync(code.Trim())",
           "id": "L25"
         },
         {
           "n": 26,
-          "t": "\u002B",
-          "c": "        ?? throw new KeyNotFoundException($\u0022Coupon \u0027{code}\u0027 not found\u0022);"
+          "t": "+",
+          "c": "        ?? throw new KeyNotFoundException($\"Coupon '{code}' not found\");"
         },
         {
           "n": 27,
@@ -905,24 +926,24 @@
         },
         {
           "n": 28,
-          "t": "\u002B",
-          "c": "    if (coupon.ExpiresAt \u003C _clock.GetUtcNow())",
+          "t": "+",
+          "c": "    if (coupon.ExpiresAt < _clock.GetUtcNow())",
           "id": "L28"
         },
         {
           "n": 29,
-          "t": "\u002B",
-          "c": "        throw new InvalidOperationException(\u0022Coupon has expired\u0022);"
+          "t": "+",
+          "c": "        throw new InvalidOperationException(\"Coupon has expired\");"
         },
         {
           "n": 30,
-          "t": "\u002B",
-          "c": "    if (coupon.Uses \u003E= coupon.MaxUses)"
+          "t": "+",
+          "c": "    if (coupon.Uses >= coupon.MaxUses)"
         },
         {
           "n": 31,
-          "t": "\u002B",
-          "c": "        throw new InvalidOperationException(\u0022Coupon has been used up\u0022);"
+          "t": "+",
+          "c": "        throw new InvalidOperationException(\"Coupon has been used up\");"
         },
         {
           "n": 32,
@@ -931,15 +952,16 @@
         },
         {
           "n": 33,
-          "t": "\u002B",
+          "t": "+",
           "c": "    return coupon;"
         },
         {
           "n": 34,
-          "t": "\u002B",
+          "t": "+",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "couponservice-recorduseasync",
@@ -957,11 +979,12 @@
       "lines": [
         {
           "n": 36,
-          "t": "\u002B",
-          "c": "public Task RecordUseAsync(Guid couponId) =\u003E _coupons.IncrementUsesAsync(couponId);",
+          "t": "+",
+          "c": "public Task RecordUseAsync(Guid couponId) => _coupons.IncrementUsesAsync(couponId);",
           "id": "L36"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "icheckoutservice-placeorderasync",
@@ -980,10 +1003,11 @@
         {
           "n": 7,
           "t": " ",
-          "c": "Task\u003COrder\u003E PlaceOrderAsync(string userId, CheckoutRequest request);",
+          "c": "Task<Order> PlaceOrderAsync(string userId, CheckoutRequest request);",
           "id": "L7"
         }
-      ]
+      ],
+      "project": "Shop.Api"
     },
     {
       "id": "pricingcalculatortests-addsflatshippingunderthreshold",
@@ -1036,7 +1060,8 @@
           "t": " ",
           "c": "}"
         }
-      ]
+      ],
+      "project": "Shop.Tests"
     }
   ],
   "edges": [
@@ -1234,15 +1259,15 @@
         "checkoutcontroller-checkout"
       ],
       "body": [
-        "Changed method in \u0060CheckoutService.cs\u0060 (\u002B7 \u22121).",
-        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 here.",
-        "Calls \u0060ICouponService.ValidateAsync()\u0060, \u0060PricingCalculator.CalculateTotal()\u0060 and \u0060ICouponService.RecordUseAsync()\u0060.",
-        "Also in this step: \u0060Coupon\u0060 (new record), \u0060CheckoutRequest.CouponCode\u0060 (new property), \u0060CheckoutService._coupons\u0060 (new field), \u0060Order.CouponId\u0060 (new property), \u0060CheckoutService constructor\u0060 (changed constructor)."
+        "Changed method in `CheckoutService.cs` (+7 \u22121).",
+        "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 here.",
+        "Calls `ICouponService.ValidateAsync()`, `PricingCalculator.CalculateTotal()` and `ICouponService.RecordUseAsync()`.",
+        "Also in this step: `Coupon` (new record), `CheckoutRequest.CouponCode` (new property), `CheckoutService._coupons` (new field), `Order.CouponId` (new property), `CheckoutService constructor` (changed constructor)."
       ],
       "checks": [
         {
           "ok": false,
-          "text": "Compiler warning CS4014 on line 42: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the \u0027await\u0027 operator to the result of the call."
+          "text": "Compiler warning CS4014 on line 42: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call."
         },
         {
           "ok": false,
@@ -1250,7 +1275,7 @@
         },
         {
           "ok": true,
-          "text": "\u0060CheckoutService constructor\u0060: All 4 injected services are registered for dependency injection."
+          "text": "`CheckoutService constructor`: All 4 injected services are registered for dependency injection."
         }
       ]
     },
@@ -1267,16 +1292,16 @@
         "icouponrepository-findbycodeasync"
       ],
       "body": [
-        "New method in \u0060CouponService.cs\u0060 (\u002B10).",
-        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060CheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060ICouponService.ValidateAsync()\u0060 \u2192 here.",
-        "Calls \u0060ICouponRepository.FindByCodeAsync()\u0060.",
-        "Uses \u0060Coupon\u0060.",
-        "Also in this step: \u0060ICouponService.ValidateAsync()\u0060 (new interface method), \u0060CouponService._coupons\u0060 (new field), \u0060CouponService._clock\u0060 (new field), \u0060CouponService constructor\u0060 (new constructor)."
+        "New method in `CouponService.cs` (+10).",
+        "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 `CheckoutService.PlaceOrderAsync()` \u2192 `ICouponService.ValidateAsync()` \u2192 here.",
+        "Calls `ICouponRepository.FindByCodeAsync()`.",
+        "Uses `Coupon`.",
+        "Also in this step: `ICouponService.ValidateAsync()` (new interface method), `CouponService._coupons` (new field), `CouponService._clock` (new field), `CouponService constructor` (new constructor)."
       ],
       "checks": [
         {
           "ok": false,
-          "text": "Can now throw \u0060InvalidOperationException\u0060, \u0060KeyNotFoundException\u0060. \u0060CheckoutService.PlaceOrderAsync()\u0060 doesn\u0027t catch them, so check where they surface."
+          "text": "Can now throw `InvalidOperationException`, `KeyNotFoundException`. `CheckoutService.PlaceOrderAsync()` doesn't catch them, so check where they surface."
         },
         {
           "ok": false,
@@ -1284,7 +1309,7 @@
         },
         {
           "ok": true,
-          "text": "\u0060CouponService constructor\u0060: Both injected services are registered for dependency injection."
+          "text": "`CouponService constructor`: Both injected services are registered for dependency injection."
         }
       ]
     },
@@ -1300,20 +1325,20 @@
         "pricingcalculatortests-addsflatshippingunderthreshold"
       ],
       "body": [
-        "Changed method in \u0060PricingCalculator.cs\u0060 (\u002B4 \u22122). The signature changed.",
-        "Reached from \u0060HTTP GET /api/Cart/{userId}/total\u0060: \u0060CartController.GetTotal()\u0060 \u2192 here.",
-        "Called from \u0060CheckoutService.PlaceOrderAsync()\u0060 and \u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060.",
-        "Calls \u0060PricingCalculator.Shipping()\u0060.",
-        "Uses \u0060Coupon\u0060."
+        "Changed method in `PricingCalculator.cs` (+4 \u22122). The signature changed.",
+        "Reached from `HTTP GET /api/Cart/{userId}/total`: `CartController.GetTotal()` \u2192 here.",
+        "Called from `CheckoutService.PlaceOrderAsync()` and `PricingCalculatorTests.AddsFlatShippingUnderThreshold()`.",
+        "Calls `PricingCalculator.Shipping()`.",
+        "Uses `Coupon`."
       ],
       "checks": [
         {
           "ok": false,
-          "text": "Signature changed. 2 call sites still use it unchanged: \u0060CartController.GetTotal()\u0060 (CartController.cs:24), \u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060 (PricingCalculatorTests.cs:15). Check they still behave as intended."
+          "text": "Signature changed. 2 call sites still use it unchanged: `CartController.GetTotal()` (CartController.cs:24), `PricingCalculatorTests.AddsFlatShippingUnderThreshold()` (PricingCalculatorTests.cs:15). Check they still behave as intended."
         },
         {
           "ok": false,
-          "text": "Existing tests reach this (\u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060), but none were added or changed for the new behavior."
+          "text": "Existing tests reach this (`PricingCalculatorTests.AddsFlatShippingUnderThreshold()`), but none were added or changed for the new behavior."
         }
       ]
     },
@@ -1327,10 +1352,10 @@
         "icouponrepository-incrementusesasync"
       ],
       "body": [
-        "New method in \u0060CouponService.cs\u0060 (\u002B1).",
-        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060CheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060ICouponService.RecordUseAsync()\u0060 \u2192 here.",
-        "Calls \u0060ICouponRepository.IncrementUsesAsync()\u0060.",
-        "Also in this step: \u0060ICouponService.RecordUseAsync()\u0060 (new interface method)."
+        "New method in `CouponService.cs` (+1).",
+        "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 `CheckoutService.PlaceOrderAsync()` \u2192 `ICouponService.RecordUseAsync()` \u2192 here.",
+        "Calls `ICouponRepository.IncrementUsesAsync()`.",
+        "Also in this step: `ICouponService.RecordUseAsync()` (new interface method)."
       ],
       "checks": [
         {
@@ -1351,11 +1376,11 @@
         "coupon"
       ],
       "body": [
-        "New method in \u0060ICouponRepository.cs\u0060 (\u002B7).",
-        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u2026 \u2192 \u0060CouponService.RecordUseAsync()\u0060 \u2192 \u0060ICouponRepository.IncrementUsesAsync()\u0060 \u2192 here.",
-        "Called from \u0060CouponService.ValidateAsync()\u0060.",
-        "Uses \u0060Coupon\u0060.",
-        "Also in this step: \u0060ICouponRepository.FindByCodeAsync()\u0060 (new interface method), \u0060InMemoryCouponRepository.FindByCodeAsync()\u0060 (new method), \u0060InMemoryCouponRepository._byCode\u0060 (new field), \u0060ICouponRepository.IncrementUsesAsync()\u0060 (new interface method)."
+        "New method in `ICouponRepository.cs` (+7).",
+        "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 \u2026 \u2192 `CouponService.RecordUseAsync()` \u2192 `ICouponRepository.IncrementUsesAsync()` \u2192 here.",
+        "Called from `CouponService.ValidateAsync()`.",
+        "Uses `Coupon`.",
+        "Also in this step: `ICouponRepository.FindByCodeAsync()` (new interface method), `InMemoryCouponRepository.FindByCodeAsync()` (new method), `InMemoryCouponRepository._byCode` (new field), `ICouponRepository.IncrementUsesAsync()` (new interface method)."
       ],
       "checks": [
         {
@@ -1364,7 +1389,7 @@
         },
         {
           "ok": false,
-          "text": "\u0060InMemoryCouponRepository.FindByCodeAsync()\u0060: No test reaches this within 3 calls."
+          "text": "`InMemoryCouponRepository.FindByCodeAsync()`: No test reaches this within 3 calls."
         }
       ]
     },
@@ -1377,9 +1402,9 @@
         "couponservice-constructor"
       ],
       "body": [
-        "Changed startup code in \u0060Program.cs\u0060 (\u002B3 \u22120).",
-        "This is where execution starts: \u0060Program start\u0060.",
-        "Registers \u0060InMemoryCouponRepository\u0060 and \u0060CouponService\u0060 for dependency injection."
+        "Changed startup code in `Program.cs` (+3 \u22120).",
+        "This is where execution starts: `Program start`.",
+        "Registers `InMemoryCouponRepository` and `CouponService` for dependency injection."
       ],
       "checks": []
     }

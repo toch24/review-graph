@@ -65,6 +65,14 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
 .edge-label.active{color:var(--accent);border-color:var(--accent)}
 .edge-label.dim{opacity:0}
 
+/* ---------- project groups ---------- */
+.group{position:absolute;left:0;top:0;border:1.5px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb, var(--fg) 4%, transparent);
+  pointer-events:auto;transition:opacity .25s}
+.group.dim{opacity:.45}
+.group-title{position:absolute;left:18px;top:12px;right:18px;display:flex;align-items:baseline;gap:10px;font:600 15px/1.2 var(--sans);
+  color:var(--fg);user-select:none;pointer-events:none;overflow:hidden;white-space:nowrap}
+.group-title small{font:500 11px/1 var(--mono);color:var(--muted)}
+
 /* ---------- nodes ---------- */
 .node{position:absolute;min-width:280px;max-width:640px;background:var(--panel);border:1px solid var(--border);
   border-radius:8px;box-shadow:var(--shadow);font:12px/1 var(--mono);transition:opacity .25s, border-color .25s, box-shadow .25s}
@@ -271,7 +279,7 @@ function hl(src){
 }
 
 /* ---------- state ---------- */
-let D, NODES, EDGES, STEPS, byId, pos, home, nodeEls, pathEls, endEls, labelEls, stepOf;
+let GROUPS, D, NODES, EDGES, STEPS, byId, pos, home, nodeEls, pathEls, endEls, labelEls, stepOf;
 const cam = {x:0, y:0, k:1};
 let active = -1, showContext = true, z = 10;
 
@@ -279,11 +287,12 @@ function load(data){
   D = data; NODES = data.nodes; EDGES = data.edges; STEPS = data.steps;
   byId = Object.fromEntries(NODES.map(n => [n.id, n]));
   stepOf = {}; STEPS.forEach((s,i) => { if (!(s.primary in stepOf)) stepOf[s.primary] = i; });
-  [...world.querySelectorAll(".node,.edge-label")].forEach(e => e.remove());
+  [...world.querySelectorAll(".node,.edge-label,.group")].forEach(e => e.remove());
   svg.innerHTML = ""; nodeEls = {}; pathEls = []; endEls = []; labelEls = [];
   active = -1;
   renderHeader();
   buildNodes();
+  buildGroups();
   buildEdges();
   layout(); pos = structuredClone(home);
   buildStepList();
@@ -339,29 +348,73 @@ function rowY(id, line){
   const r = line && el.querySelector(`[data-line="${line}"]`);
   return r ? r.offsetTop + r.offsetHeight/2 : 22;
 }
+const GPAD = 28, GHEAD = 50, GGAP = 56;
+// Cards are grouped by project. Inside a group: one column per call depth, rows in reading order.
+function buildGroups(){
+  const names = [...new Set(NODES.map(n => n.project || ""))];
+  const first = {}; NODES.forEach(n => { const p = n.project || ""; first[p] = Math.min(first[p] ?? Infinity, n.layer * 1e4 + n.order); });
+  const testOnly = p => NODES.filter(n => (n.project || "") === p).every(n => n.test);
+  names.sort((a,b) => testOnly(a) - testOnly(b) || first[a] - first[b]);
+  GROUPS = names.map(name => {
+    const el = document.createElement("div"); el.className = "group";
+    el.innerHTML = name ? `<div class="group-title">${esc(name)}<small></small></div>` : "";
+    world.prepend(el);
+    return {name, el, ids:NODES.filter(n => (n.project || "") === name).map(n => n.id), x:0, y:0, w:0, h:0};
+  });
+}
+const groupOf = id => GROUPS.find(g => g.ids.includes(id));
 function layout(){
-  const GAPX = 120, GAPY = 32;
-  const layers = [...new Set(NODES.map(n => n.layer))].sort((a,b) => a-b);
-  home = {}; let x = 0;
-  for (const L of layers){
-    const col = NODES.filter(n => n.layer === L && visible(n.id)).sort((a,b) => a.order - b.order);
-    const w = Math.max(0, ...col.map(n => nodeEls[n.id].offsetWidth));
-    let bottom = -Infinity;
-    for (const n of col){
-      const ins = EDGES.map(e => ({e, s:parse(e.from)})).filter(({e,s}) => parse(e.to).id === n.id && home[s.id] && byId[s.id].layer < L);
-      const want = ins.length ? ins.reduce((a,{e,s}) => a + home[s.id].y + rowY(s.id, s.line), 0) / ins.length - 22 : 0;
-      const y = bottom === -Infinity ? want : Math.max(want, bottom + GAPY);
-      home[n.id] = {x, y};
-      bottom = y + nodeEls[n.id].offsetHeight;
+  const GAPX = 100, GAPY = 32;
+  home = {}; let gy = 0;
+  for (const g of GROUPS){
+    const members = NODES.filter(n => g.ids.includes(n.id));
+    const layers = [...new Set(members.map(n => n.layer))].sort((a,b) => a-b);
+    const head = g.name ? GHEAD : GPAD;
+    let x = 0, maxB = 0;
+    for (const L of layers){
+      const col = members.filter(n => n.layer === L && visible(n.id)).sort((a,b) => a.order - b.order);
+      const w = Math.max(0, ...col.map(n => nodeEls[n.id].offsetWidth));
+      let bottom = -Infinity;
+      for (const n of col){
+        const ins = EDGES.map(e => ({e, s:parse(e.from)})).filter(({e,s}) => parse(e.to).id === n.id && home[s.id] && g.ids.includes(s.id) && byId[s.id].layer < L);
+        const want = ins.length ? ins.reduce((a,{e,s}) => a + home[s.id].y - gy - head + rowY(s.id, s.line), 0) / ins.length - 22 : 0;
+        const y = bottom === -Infinity ? Math.max(0, want) : Math.max(want, bottom + GAPY);
+        home[n.id] = {x: GPAD + x, y: gy + head + y};
+        bottom = y + nodeEls[n.id].offsetHeight; maxB = Math.max(maxB, bottom);
+      }
+      if (col.length) x += w + GAPX;
     }
-    if (col.length) x += w + GAPX;
+    g.x = 0; g.y = gy; g.w = Math.max(320, x - GAPX + GPAD * 2); g.h = head + maxB + GPAD;
+    g.vis = members.some(n => visible(n.id));
+    if (g.vis) gy += g.h + GGAP;
   }
   for (const n of NODES) if (!home[n.id]) home[n.id] = {x:0, y:0};
+}
+// A card that grew (expand) must still fit its group; later groups slide down to make room.
+function growGroup(id){
+  const g = groupOf(id), el = nodeEls[id]; if (!g) return;
+  const p = pos[id], r = p.x + el.offsetWidth + GPAD - g.x, b = p.y + el.offsetHeight + GPAD - g.y;
+  const dw = Math.max(0, r - g.w), dh = Math.max(0, b - g.h);
+  g.w += dw; g.h += dh;
+  if (dh) for (const o of GROUPS) if (o !== g && o.vis && o.y > g.y){ o.y += dh; o.ids.forEach(i => pos[i].y += dh); }
+}
+function clampToGroup(id){
+  const g = groupOf(id), el = nodeEls[id], p = pos[id]; if (!g) return;
+  const top = g.y + (g.name ? GHEAD : GPAD);
+  p.x = Math.min(Math.max(p.x, g.x + GPAD), Math.max(g.x + GPAD, g.x + g.w - GPAD - el.offsetWidth));
+  p.y = Math.min(Math.max(p.y, top), Math.max(top, g.y + g.h - GPAD - el.offsetHeight));
 }
 
 /* ---------- drawing ---------- */
 function visible(id){ return showContext || byId[id].kind !== "context"; }
-function placeNodes(){ for (const id in nodeEls){ nodeEls[id].style.transform = `translate(${pos[id].x}px,${pos[id].y}px)`; nodeEls[id].hidden = !visible(id); } }
+function placeGroups(){
+  for (const g of GROUPS){
+    g.el.hidden = !g.vis || !g.name;
+    g.el.style.transform = `translate(${g.x}px,${g.y}px)`; g.el.style.width = g.w + "px"; g.el.style.height = g.h + "px";
+    const c = g.ids.filter(visible).length; const sm = g.el.querySelector("small"); if (sm) sm.textContent = `${c} card${c===1?"":"s"}`;
+  }
+}
+function placeNodes(){ placeGroups(); for (const id in nodeEls){ nodeEls[id].style.transform = `translate(${pos[id].x}px,${pos[id].y}px)`; nodeEls[id].hidden = !visible(id); } }
 function drawEdges(){
   EDGES.forEach((e,i) => {
     const s = parse(e.from), t = parse(e.to);
@@ -468,6 +521,7 @@ function setStep(i, anim = true){
     el.classList.toggle("focus", !!set && set.has(id));
     el.classList.toggle("primary", !!st && st.primary === id);
   }
+  for (const g of GROUPS) g.el.classList.toggle("dim", !!set && !g.ids.some(i => set.has(i)));
   world.querySelectorAll(".row.anchor.hot").forEach(r => r.classList.remove("hot"));
   EDGES.forEach((e,k) => {
     const s = parse(e.from), t = parse(e.to);
@@ -551,7 +605,7 @@ canvas.addEventListener("pointermove", e => {
   }
   const dx = e.clientX - mode.sx, dy = e.clientY - mode.sy;
   if (Math.abs(dx)+Math.abs(dy) > 4) mode.moved = true;
-  if (mode.type === "node"){ pos[mode.id].x = mode.ox + dx/cam.k; pos[mode.id].y = mode.oy + dy/cam.k; draw(); }
+  if (mode.type === "node"){ pos[mode.id].x = mode.ox + dx/cam.k; pos[mode.id].y = mode.oy + dy/cam.k; clampToGroup(mode.id); draw(); }
   else if (mode.type === "pan"){ cam.x = mode.ox + dx; cam.y = mode.oy + dy; applyCam(); }
 });
 function end(e){
@@ -569,6 +623,7 @@ canvas.addEventListener("click", e => {
   const el = b.closest(".node"), on = el.classList.toggle("expanded");
   b.setAttribute("aria-pressed", on); b.title = on ? "Collapse card" : "Expand to show full lines"; b.setAttribute("aria-label", b.title);
   if (on) el.style.zIndex = ++z;
+  growGroup(el.dataset.id); clampToGroup(el.dataset.id);
   drawNow();
 });
 canvas.addEventListener("pointerup", end);

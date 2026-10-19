@@ -974,9 +974,23 @@ public sealed partial class Analyzer
             var dir = n.RelPath.Contains('/') ? n.RelPath[..(n.RelPath.LastIndexOf('/') + 1)] : "";
             var kind = n.Changed ? (n.IsNew ? "new" : "changed") : "context";
             list.Add(new NodeOut(n.Id, kind, n.Display, n.MemberKind, dir, System.IO.Path.GetFileName(n.RelPath), n.StartLine,
-                n.Entry, n.IsTest, n.Adds, n.Dels, n.Layer, n.Order, RenderLines(n)));
+                n.Entry, n.IsTest, n.Adds, n.Dels, n.Layer, n.Order, RenderLines(n), ProjectOf(n)));
         }
         return list;
+    }
+
+    // Code cards know their Roslyn project; file cards (configs, docs, ...) join the project whose folder contains them.
+    private string ProjectOf(GNode n)
+    {
+        if (n.Doc is not null) return n.Doc.Project.Name;
+        var best = (Dir: "", Name: (string?)null);
+        foreach (var p in _sln.Projects)
+        {
+            if (p.FilePath is null || Rel(System.IO.Path.GetDirectoryName(p.FilePath)) is not { } dir) continue;
+            dir = dir == "." ? "" : dir.TrimEnd('/') + "/";
+            if (n.RelPath.StartsWith(dir, StringComparison.Ordinal) && (best.Name is null || dir.Length > best.Dir.Length)) best = (dir, p.Name);
+        }
+        return best.Name ?? "Other files";
     }
 
     private List<EdgeOut> EmitEdges() => _edges
