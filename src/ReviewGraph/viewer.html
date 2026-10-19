@@ -82,6 +82,12 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
 .node-sym{font-weight:600;font-size:13px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .node-path{font:11px/1.2 var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .node-path b{color:var(--fg);font-weight:500}
+.expand{flex:none;width:22px;height:22px;display:grid;place-items:center;padding:0;border:1px solid var(--border);border-radius:5px;
+  background:transparent;color:var(--muted);cursor:pointer}
+.expand:hover{color:var(--fg);border-color:var(--border-strong)}
+.expand svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.node.expanded{max-width:none;z-index:50}
+.node.expanded .row .code{overflow:visible;text-overflow:clip}
 .badge{display:inline-flex;align-items:center;font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;
   padding:4px 6px;border-radius:4px;border:1px solid currentColor;flex:none}
 .badge.new{color:var(--new)} .badge.changed{color:var(--changed)} .badge.context{color:var(--context)}
@@ -306,7 +312,8 @@ function buildNodes(){
     const entry = n.entry ? `<div class="entry${n.entry==="Test"?" test":""}">${esc(n.entry)}</div>` : "";
     el.innerHTML = `${pin}<span class="target-handle"></span>
       <div class="node-head" title="${esc(n.path+n.file)}:${n.line}"><span class="badge ${n.kind}">${KIND[n.kind]}</span>
-        <div class="node-title"><span class="node-sym">${esc(n.sym)}</span><span class="node-path">${esc(n.member)} · ${esc(n.path)}<b>${esc(n.file)}</b></span></div>${stat}</div>
+        <div class="node-title"><span class="node-sym">${esc(n.sym)}</span><span class="node-path">${esc(n.member)} · ${esc(n.path)}<b>${esc(n.file)}</b></span></div>${stat}
+        <button class="expand" type="button" title="Expand to show full lines" aria-label="Expand card" aria-pressed="false"><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5l-4.5 4.5M2.5 13.5L7 9"/></svg></button></div>
       ${entry}<div class="rows">${rows}</div>`;
     world.appendChild(el);
     nodeEls[n.id] = el;
@@ -511,7 +518,7 @@ $("#file").onchange = async e => {
 /* ---------- pointer: drag cards, pan, pinch ---------- */
 const pts = new Map(); let mode = null;
 canvas.addEventListener("pointerdown", e => {
-  if (e.target.closest(".controls,.legend")) return;
+  if (e.target.closest(".controls,.legend,.expand")) return;
   pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if (pts.size === 2){
     const [a,b] = [...pts.values()];
@@ -557,6 +564,13 @@ function end(e){
   if (mode && mode.type === "node") nodeEls[mode.id].classList.remove("dragging");
   if (pts.size === 0){ mode = null; canvas.classList.remove("panning"); }
 }
+canvas.addEventListener("click", e => {
+  const b = e.target.closest(".expand"); if (!b) return;
+  const el = b.closest(".node"), on = el.classList.toggle("expanded");
+  b.setAttribute("aria-pressed", on); b.title = on ? "Collapse card" : "Expand to show full lines"; b.setAttribute("aria-label", b.title);
+  if (on) el.style.zIndex = ++z;
+  drawNow();
+});
 canvas.addEventListener("pointerup", end);
 canvas.addEventListener("pointercancel", end);
 canvas.addEventListener("wheel", e => {
