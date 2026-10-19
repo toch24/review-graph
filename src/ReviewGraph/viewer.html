@@ -69,8 +69,9 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
 .group{position:absolute;left:0;top:0;border:1.5px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb, var(--fg) 4%, transparent);
   pointer-events:auto;transition:opacity .25s}
 .group.dim{opacity:.45}
-.group-title{position:absolute;left:18px;top:12px;right:18px;display:flex;align-items:baseline;gap:10px;font:600 15px/1.2 var(--sans);
-  color:var(--fg);user-select:none;pointer-events:none;overflow:hidden;white-space:nowrap}
+.group-title{position:absolute;left:0;top:0;right:0;height:46px;padding:15px 18px 0;box-sizing:border-box;display:flex;align-items:baseline;gap:10px;
+  font:600 15px/1.2 var(--sans);color:var(--fg);user-select:none;cursor:grab;overflow:hidden;white-space:nowrap;border-radius:14px 14px 0 0}
+.group-title:active{cursor:grabbing}
 .group-title small{font:500 11px/1 var(--mono);color:var(--muted)}
 
 /* ---------- nodes ---------- */
@@ -581,6 +582,13 @@ canvas.addEventListener("pointerdown", e => {
     canvas.setPointerCapture(e.pointerId);
     return;
   }
+  const gt = e.target.closest(".group-title");
+  if (gt){
+    const g = GROUPS.find(x => x.el === gt.parentElement);
+    mode = {type:"group", g, sx:e.clientX, sy:e.clientY, ox:g.x, oy:g.y, from:g.ids.map(id => [id, pos[id].x, pos[id].y]), moved:false};
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
   const head = e.target.closest(".node-head"), node = e.target.closest(".node");
   if (head){
     const id = node.dataset.id;
@@ -606,6 +614,12 @@ canvas.addEventListener("pointermove", e => {
   const dx = e.clientX - mode.sx, dy = e.clientY - mode.sy;
   if (Math.abs(dx)+Math.abs(dy) > 4) mode.moved = true;
   if (mode.type === "node"){ pos[mode.id].x = mode.ox + dx/cam.k; pos[mode.id].y = mode.oy + dy/cam.k; clampToGroup(mode.id); draw(); }
+  else if (mode.type === "group"){
+    const gx = dx/cam.k, gy = dy/cam.k;
+    mode.g.x = mode.ox + gx; mode.g.y = mode.oy + gy;
+    for (const [id,x,y] of mode.from){ pos[id].x = x + gx; pos[id].y = y + gy; }
+    draw();
+  }
   else if (mode.type === "pan"){ cam.x = mode.ox + dx; cam.y = mode.oy + dy; applyCam(); }
 });
 function end(e){
