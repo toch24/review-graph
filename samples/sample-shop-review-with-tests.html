@@ -1,0 +1,661 @@
+<title>Add coupon codes to checkout (with tests)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-height app. Dot-grid canvas with draggable code cards laid out in call-depth columns; story panel on the right (bottom sheet on phones). Dark-first. */
+:root{
+  --bg:#111413; --panel:#191c1b; --panel-2:#1f2321; --border:#2b302e; --border-strong:#3a403d;
+  --fg:#e7ebe9; --muted:#8b9590; --faint:#5d6662; --dot:#2a2f2d;
+  --accent:#3ecf8e; --accent-soft:rgba(62,207,142,.14); --edge:#47504c;
+  --add-bg:rgba(62,207,142,.10); --add-fg:#3ecf8e; --del-bg:rgba(240,98,98,.11); --del-fg:#f07272;
+  --new:#3ecf8e; --changed:#e9b44c; --context:#7d8783; --warn:#e9b44c;
+  --tk-k:#c792ea; --tk-s:#9fd8a8; --tk-n:#f2b57a; --tk-f:#7fb8f5; --tk-t:#e7c77b; --tk-c:#5d6662;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 12px 30px -12px rgba(0,0,0,.6);
+  --sans:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#f5f7f6; --panel:#ffffff; --panel-2:#f3f5f4; --border:#dde3e0; --border-strong:#c6cecb;
+  --fg:#18201c; --muted:#5f6a65; --faint:#97a19c; --dot:#d3dad7;
+  --accent:#16955e; --accent-soft:rgba(22,149,94,.10); --edge:#b4bdb9;
+  --add-bg:rgba(22,149,94,.09); --add-fg:#12804f; --del-bg:rgba(214,55,55,.08); --del-fg:#c33a3a;
+  --new:#16955e; --changed:#b7801a; --context:#8a948f; --warn:#b7801a;
+  --tk-k:#8a3fc4; --tk-s:#2c7a3f; --tk-n:#b25f12; --tk-f:#1f63b8; --tk-t:#8a6510; --tk-c:#97a19c;
+  --shadow:0 1px 2px rgba(20,30,25,.06), 0 10px 24px -14px rgba(20,30,25,.25);
+  color-scheme:light;
+}}
+:root[data-theme="light"]{
+  --bg:#f5f7f6; --panel:#ffffff; --panel-2:#f3f5f4; --border:#dde3e0; --border-strong:#c6cecb;
+  --fg:#18201c; --muted:#5f6a65; --faint:#97a19c; --dot:#d3dad7;
+  --accent:#16955e; --accent-soft:rgba(22,149,94,.10); --edge:#b4bdb9;
+  --add-bg:rgba(22,149,94,.09); --add-fg:#12804f; --del-bg:rgba(214,55,55,.08); --del-fg:#c33a3a;
+  --new:#16955e; --changed:#b7801a; --context:#8a948f; --warn:#b7801a;
+  --tk-k:#8a3fc4; --tk-s:#2c7a3f; --tk-n:#b25f12; --tk-f:#1f63b8; --tk-t:#8a6510; --tk-c:#97a19c;
+  --shadow:0 1px 2px rgba(20,30,25,.06), 0 10px 24px -14px rgba(20,30,25,.25);
+  color-scheme:light;
+}
+
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans);overflow:hidden}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);border:1px solid var(--border);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
+
+.app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
+
+/* ---------- canvas ---------- */
+.canvas{position:relative;overflow:hidden;touch-action:none;cursor:grab;
+  background-color:var(--bg);background-image:radial-gradient(circle, var(--dot) 1.1px, transparent 1.3px);background-size:20px 20px}
+.canvas.panning{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0}
+.canvas.anim .world{transition:transform .5s cubic-bezier(.2,.75,.2,1)}
+.canvas.anim{transition:background-position .5s cubic-bezier(.2,.75,.2,1), background-size .5s cubic-bezier(.2,.75,.2,1)}
+svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.5;transition:opacity .25s, stroke .25s}
+.edge.soft{stroke-dasharray:3 4}
+.edge.active{stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5;animation:flow 1s linear infinite}
+.edge.dim{opacity:.14}
+@keyframes flow{to{stroke-dashoffset:-11}}
+.edge-end{fill:var(--edge)} .edge-end.active{fill:var(--accent)} .edge-end.dim{opacity:.14}
+.edge-label{position:absolute;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
+  font:500 10.5px/1 var(--mono);padding:4px 6px;border-radius:4px;border:1px solid var(--border);
+  background:var(--panel);color:var(--muted);transition:opacity .25s}
+.edge-label.active{color:var(--accent);border-color:var(--accent)}
+.edge-label.dim{opacity:0}
+
+/* ---------- project groups ---------- */
+.group{position:absolute;left:0;top:0;border:1.5px solid var(--border-strong);border-radius:14px;background:color-mix(in srgb, var(--fg) 4%, transparent);
+  pointer-events:auto;transition:opacity .25s}
+.group.dim{opacity:.45}
+.group-title{position:absolute;left:0;top:0;right:0;height:46px;padding:15px 18px 0;box-sizing:border-box;display:flex;align-items:baseline;gap:10px;
+  font:600 15px/1.2 var(--sans);color:var(--fg);user-select:none;cursor:grab;overflow:hidden;white-space:nowrap;border-radius:14px 14px 0 0}
+.group-title:active{cursor:grabbing}
+.group-title small{font:500 11px/1 var(--mono);color:var(--muted)}
+
+/* ---------- nodes ---------- */
+.node{position:absolute;min-width:280px;max-width:640px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;box-shadow:var(--shadow);font:12px/1 var(--mono);transition:opacity .25s, border-color .25s, box-shadow .25s}
+.node.context{border-style:dashed}
+.node.dim{opacity:.3}
+.node.focus{border-color:var(--border-strong)}
+.node.primary{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 3px var(--accent-soft), var(--shadow)}
+.node.dragging{box-shadow:0 0 0 1px var(--border-strong), 0 24px 40px -16px rgba(0,0,0,.55);transition:none}
+.node.pulse{animation:pulse .9s ease-out}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--accent)}100%{box-shadow:0 0 0 14px transparent}}
+.node-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);
+  background:var(--panel-2);border-radius:8px 8px 0 0;cursor:grab;user-select:none;font-family:var(--sans)}
+.node-head:active{cursor:grabbing}
+.node-title{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.node-sym{font-weight:600;font-size:13px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node-path{font:11px/1.2 var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node-path b{color:var(--fg);font-weight:500}
+.expand{flex:none;width:22px;height:22px;display:grid;place-items:center;padding:0;border:1px solid var(--border);border-radius:5px;
+  background:transparent;color:var(--muted);cursor:pointer}
+.expand:hover{color:var(--fg);border-color:var(--border-strong)}
+.expand svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.node.expanded{max-width:none;z-index:50}
+.node.expanded .row .code{overflow:visible;text-overflow:clip}
+.badge{display:inline-flex;align-items:center;font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;
+  padding:4px 6px;border-radius:4px;border:1px solid currentColor;flex:none}
+.badge.new{color:var(--new)} .badge.changed{color:var(--changed)} .badge.context{color:var(--context)}
+.stat{font:500 11px/1 var(--mono);flex:none;display:flex;gap:6px}
+.stat .a{color:var(--add-fg)} .stat .d{color:var(--del-fg)}
+.entry{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);font:500 11px/1.2 var(--mono);color:var(--accent)}
+.entry::before{content:"";width:0;height:0;border-left:6px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent}
+.entry.test{color:var(--muted)}
+.step-pin{position:absolute;top:-11px;left:-11px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  background:var(--bg);border:1px solid var(--border-strong);font:600 11px/1 var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
+.node.primary .step-pin{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.target-handle{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--panel);border:1.5px solid var(--edge);top:19px;left:-5.5px}
+.target-handle.r{left:auto;right:-5.5px}
+
+.rows{padding:4px 0 6px}
+.row{display:flex;align-items:center;height:21px;white-space:pre;position:relative;padding-right:14px}
+.row .ln{width:40px;flex:none;text-align:right;padding-right:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+.row .sg{width:14px;flex:none;color:var(--faint)}
+.row .code{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.row.add{background:var(--add-bg)} .row.add .sg{color:var(--add-fg)}
+.row.del{background:var(--del-bg)} .row.del .sg{color:var(--del-fg)} .row.del .code{opacity:.75;text-decoration:line-through;text-decoration-color:var(--del-fg)}
+.row.fold{color:var(--faint);font-style:italic;height:19px}
+.row.fold .code{border-top:1px dashed var(--border);border-bottom:1px dashed var(--border);padding:1px 8px;margin-left:-4px}
+.row.anchor::after{content:"";position:absolute;right:-5.5px;top:50%;width:9px;height:9px;margin-top:-4.5px;border-radius:50%;
+  background:var(--panel);border:1.5px solid var(--edge)}
+.row.anchor.l::after{right:auto;left:-5.5px}
+.row.anchor.hot::after{border-color:var(--accent);background:var(--accent)}
+.row.anchor.hot{box-shadow:inset 2px 0 0 var(--accent)}
+.tk-k{color:var(--tk-k)} .tk-s{color:var(--tk-s)} .tk-n{color:var(--tk-n)} .tk-f{color:var(--tk-f)} .tk-t{color:var(--tk-t)} .tk-c{color:var(--tk-c);font-style:italic}
+
+/* ---------- canvas chrome ---------- */
+.legend{position:absolute;top:14px;left:14px;display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--border);
+  border-radius:8px;background:var(--panel);font:500 11px/1 var(--mono);color:var(--muted);z-index:5}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:8px;height:8px;border-radius:2px;display:block}
+.legend i.ctx{background:transparent;border:1px dashed var(--context)}
+.controls{position:absolute;left:14px;bottom:14px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;
+  background:var(--panel);overflow:hidden;z-index:5}
+.controls button{width:34px;height:32px;border:0;background:none;cursor:pointer;display:grid;place-items:center;color:var(--muted)}
+.controls button+button{border-top:1px solid var(--border)}
+.controls button:hover{color:var(--fg);background:var(--panel-2)}
+.controls button[aria-pressed="false"]{color:var(--faint)}
+.controls svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.hint{position:absolute;right:14px;bottom:14px;font:11px/1.4 var(--mono);color:var(--muted);z-index:5;text-align:right;pointer-events:none;
+  background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 10px}
+.zoom-read{position:absolute;left:58px;bottom:14px;font:500 11px/32px var(--mono);color:var(--faint);z-index:5;font-variant-numeric:tabular-nums}
+
+/* ---------- panel ---------- */
+.panel{border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0;min-width:0}
+.pr{padding:18px 20px 16px;border-bottom:1px solid var(--border)}
+.pr-repo{font:12px/1.4 var(--mono);color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pr-repo .branch{color:var(--fg)}
+.pr h1{font-size:18px;line-height:1.3;font-weight:600;margin:10px 0 10px;text-wrap:balance;letter-spacing:-.01em}
+.pr-meta{display:flex;gap:14px;flex-wrap:wrap;font:12px/1 var(--mono);color:var(--muted)}
+.pr-meta .a{color:var(--add-fg)} .pr-meta .d{color:var(--del-fg)}
+.loadbtn{margin-left:auto;border:1px solid var(--border-strong);background:var(--panel-2);border-radius:6px;padding:4px 8px;font:11px/1 var(--mono);cursor:pointer;color:var(--muted)}
+.loadbtn:hover{color:var(--fg)}
+
+.scroll{flex:1;overflow-y:auto;min-height:0}
+.step{padding:20px 20px 18px;border-bottom:1px solid var(--border)}
+.eyebrow{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+.step h2{font-size:16px;line-height:1.35;font-weight:600;margin:10px 0 10px;text-wrap:balance;overflow-wrap:anywhere}
+.step p{margin:0 0 8px;color:var(--muted);max-width:65ch}
+.step h3{font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:20px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);background:var(--panel-2);border-radius:6px;
+  padding:6px 9px;font:12px/1.2 var(--mono);cursor:pointer;color:var(--fg);max-width:100%;text-align:left}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip:hover{border-color:var(--border-strong)}
+.chip i{width:7px;height:7px;border-radius:2px;display:block;flex:none}
+.chip i.ctx{background:transparent;border:1px dashed var(--context)}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.checks li{display:grid;grid-template-columns:18px 1fr;gap:8px;font-size:13px;line-height:1.5;color:var(--fg);min-width:0}
+.checks li::before{content:"!";width:14px;height:14px;margin-top:3px;border-radius:4px;border:1.5px solid var(--warn);color:var(--warn);
+  font:700 9px/11px var(--sans);text-align:center}
+.checks li.ok::before{content:"✓";border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.warnings{margin:0;padding:0 0 0 18px;color:var(--warn);font-size:12.5px}
+
+.steplist{list-style:none;margin:0;padding:12px 12px 16px;display:flex;flex-direction:column;gap:2px}
+.steplist button{width:100%;display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:start;text-align:left;
+  background:none;border:0;border-radius:6px;padding:8px;cursor:pointer;color:var(--muted);font-size:13px;line-height:1.4}
+.steplist button:hover{background:var(--panel-2);color:var(--fg)}
+.steplist .n{width:22px;height:22px;border-radius:50%;border:1px solid var(--border-strong);display:grid;place-items:center;
+  font:600 11px/1 var(--sans);font-variant-numeric:tabular-nums}
+.steplist .flags{font:500 11px/22px var(--mono);color:var(--warn);font-variant-numeric:tabular-nums}
+.steplist .t{overflow-wrap:anywhere}
+.steplist button[aria-current="step"]{background:var(--accent-soft);color:var(--fg)}
+.steplist button[aria-current="step"] .n{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+
+.nav{display:flex;gap:8px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border)}
+.nav button{flex:1;height:36px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);cursor:pointer;font-weight:500}
+.nav button.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.nav button:disabled{opacity:.4;cursor:default}
+.nav kbd{font:11px var(--mono);opacity:.6;margin-left:6px}
+
+.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px}
+
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:55% 45%}
+  .panel{border-left:0;border-top:1px solid var(--border)}
+  .hint{display:none}
+  .legend{gap:10px;padding:7px 10px}
+  .pr{padding:14px 16px 12px} .pr h1{font-size:16px;margin:8px 0}
+  .step{padding:16px} .nav{padding-inline:16px}
+  .nav kbd{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .canvas.anim .world,.canvas.anim{transition:none}
+  .edge.active{animation:none}
+  .node.pulse{animation:none}
+}
+</style>
+
+<div class="app">
+  <main class="canvas" id="canvas" aria-label="Code review graph">
+    <div class="world" id="world"><svg class="edges" id="edges"></svg></div>
+    <div class="legend" aria-label="Legend">
+      <span><i style="background:var(--new)"></i>New</span>
+      <span><i style="background:var(--changed)"></i>Changed</span>
+      <span><i class="ctx"></i>Unchanged context</span>
+    </div>
+    <div class="controls">
+      <button id="zin" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
+      <button id="zout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button>
+      <button id="zfit" title="Fit view (F)" aria-label="Fit view"><svg viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
+      <button id="relayout" title="Reset layout" aria-label="Reset layout"><svg viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.5-3.5M3 2v3h3"/></svg></button>
+      <button id="ctx" title="Hide context cards" aria-label="Show context cards" aria-pressed="true"><svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke-dasharray="2 2"/><path d="M5.5 8h5"/></svg></button>
+    </div>
+    <div class="zoom-read" id="zread">100%</div>
+    <div class="hint">Drag cards by their header · scroll to pan · ⌘/Ctrl + scroll to zoom<br>← → to move through the story</div>
+  </main>
+
+  <aside class="panel" aria-label="Review story">
+    <header class="pr">
+      <div class="pr-repo"><span id="repo"></span><span class="branch" id="branch"></span>
+        <button class="loadbtn" id="loadbtn" title="Open a review.json produced by reviewgraph">Open JSON</button>
+        <input type="file" id="file" accept=".json,application/json" hidden>
+      </div>
+      <h1 id="title"></h1>
+      <div class="pr-meta" id="prmeta"></div>
+    </header>
+    <div class="scroll" id="scroll">
+      <section class="step" id="step" aria-live="polite"></section>
+      <ol class="steplist" id="steplist"></ol>
+    </div>
+    <div class="nav">
+      <button id="prev">Back<kbd>←</kbd></button>
+      <button id="next" class="primary">Next<kbd>→</kbd></button>
+    </div>
+  </aside>
+</div>
+
+<script>
+const EMBEDDED = {"pr": {"repo": "sample-shop", "title": "Add coupon codes to checkout (with tests)", "branch": "feature/coupons", "base": "main @ 0a69474c", "head": "6e7311ae", "analysis": "msbuild"}, "stats": {"adds": 141, "dels": 4, "filesChanged": 10, "changedNodes": 26, "contextNodes": 5}, "overview": ["26 changed units across 10 files, told in 6 steps.", "Entry points involved: `HTTP GET /api/Cart/{userId}/total`, `HTTP POST /api/Checkout` and `Program start`.", "Colored cards are code this PR changes. Gray cards are unchanged code, included because the change calls into it or is called from it."], "nodes": [{"id": "cartcontroller-gettotal", "kind": "context", "sym": "CartController.GetTotal()", "member": "method", "path": "src/Shop.Api/Controllers/", "file": "CartController.cs", "line": 20, "entry": "HTTP GET /api/Cart/{userId}/total", "test": false, "adds": 0, "dels": 0, "layer": 2, "order": 22, "lines": [{"n": 20, "t": " ", "c": "[HttpGet(\"{userId}/total\")]"}, {"n": 21, "t": " ", "c": "public async Task<ActionResult<decimal>> GetTotal(string userId)"}, {"n": 22, "t": " ", "c": "{"}, {"n": 23, "t": " ", "c": "    var cart = await _carts.GetAsync(userId);"}, {"n": 24, "t": " ", "c": "    return Ok(_pricing.CalculateTotal(cart));", "id": "L24"}, {"n": 25, "t": " ", "c": "}"}], "project": "Shop.Api"}, {"id": "checkoutcontroller-checkout", "kind": "context", "sym": "CheckoutController.Checkout()", "member": "method", "path": "src/Shop.Api/Controllers/", "file": "CheckoutController.cs", "line": 15, "entry": "HTTP POST /api/Checkout", "test": false, "adds": 0, "dels": 0, "layer": 0, "order": 0, "lines": [{"n": 15, "t": " ", "c": "[HttpPost]"}, {"n": 16, "t": " ", "c": "public async Task<ActionResult<Order>> Checkout([FromBody] CheckoutRequest request)"}, {"n": 17, "t": " ", "c": "{"}, {"n": 18, "t": " ", "c": "    var userId = User.Identity?.Name ?? \"anonymous\";"}, {"n": 19, "t": " ", "c": "    var order = await _checkout.PlaceOrderAsync(userId, request);", "id": "L19"}, {"n": 20, "t": " ", "c": "    return Ok(order);"}, {"n": 21, "t": " ", "c": "}"}], "project": "Shop.Api"}, {"id": "icouponrepository-findbycodeasync", "kind": "new", "sym": "ICouponRepository.FindByCodeAsync()", "member": "interface method", "path": "src/Shop.Api/Data/", "file": "ICouponRepository.cs", "line": 7, "test": false, "adds": 1, "dels": 0, "layer": 5, "order": 8, "lines": [{"n": 7, "t": "+", "c": "Task<Coupon?> FindByCodeAsync(string code);", "id": "L7"}], "project": "Shop.Api"}, {"id": "icouponrepository-incrementusesasync", "kind": "new", "sym": "ICouponRepository.IncrementUsesAsync()", "member": "interface method", "path": "src/Shop.Api/Data/", "file": "ICouponRepository.cs", "line": 8, "test": false, "adds": 1, "dels": 0, "layer": 5, "order": 18, "lines": [{"n": 8, "t": "+", "c": "Task IncrementUsesAsync(Guid couponId);", "id": "L8"}], "project": "Shop.Api"}, {"id": "inmemorycouponrepository-bycode", "kind": "new", "sym": "InMemoryCouponRepository._byCode", "member": "field", "path": "src/Shop.Api/Data/", "file": "ICouponRepository.cs", "line": 13, "test": false, "adds": 1, "dels": 0, "layer": 7, "order": 10, "lines": [{"n": 13, "t": "+", "c": "private readonly Dictionary<string, Coupon> _byCode = new(StringComparer.OrdinalIgnoreCase);", "id": "L13"}], "project": "Shop.Api"}, {"id": "inmemorycouponrepository-findbycodeasync", "kind": "new", "sym": "InMemoryCouponRepository.FindByCodeAsync()", "member": "method", "path": "src/Shop.Api/Data/", "file": "ICouponRepository.cs", "line": 15, "test": false, "adds": 2, "dels": 0, "layer": 6, "order": 9, "lines": [{"n": 15, "t": "+", "c": "public Task<Coupon?> FindByCodeAsync(string code) =>", "id": "L15"}, {"n": 16, "t": "+", "c": "    Task.FromResult(_byCode.TryGetValue(code, out var c) ? c : null);", "id": "L16"}], "project": "Shop.Api"}, {"id": "inmemorycouponrepository-incrementusesasync", "kind": "new", "sym": "InMemoryCouponRepository.IncrementUsesAsync()", "member": "method", "path": "src/Shop.Api/Data/", "file": "ICouponRepository.cs", "line": 18, "test": false, "adds": 7, "dels": 0, "layer": 6, "order": 19, "lines": [{"n": 18, "t": "+", "c": "public Task IncrementUsesAsync(Guid couponId)"}, {"n": 19, "t": "+", "c": "{"}, {"n": 20, "t": "+", "c": "    var match = _byCode.Values.FirstOrDefault(c => c.Id == couponId);", "id": "L20"}, {"n": 21, "t": "+", "c": "    if (match is not null)"}, {"n": 22, "t": "+", "c": "        _byCode[match.Code] = match with { Uses = match.Uses + 1 };"}, {"n": 23, "t": "+", "c": "    return Task.CompletedTask;"}, {"n": 24, "t": "+", "c": "}"}], "project": "Shop.Api"}, {"id": "checkoutrequest-couponcode", "kind": "new", "sym": "CheckoutRequest.CouponCode", "member": "property", "path": "src/Shop.Api/Models/", "file": "CheckoutRequest.cs", "line": 6, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 4, "lines": [{"n": 6, "t": "+", "c": "public string? CouponCode { get; set; }"}], "project": "Shop.Api"}, {"id": "coupon", "kind": "new", "sym": "Coupon", "member": "record", "path": "src/Shop.Api/Models/", "file": "Coupon.cs", "line": 3, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 3, "lines": [{"n": 3, "t": "+", "c": "public record Coupon(Guid Id, string Code, int PercentOff, DateTimeOffset ExpiresAt, int Uses, int MaxUses);"}], "project": "Shop.Api"}, {"id": "order-couponid", "kind": "new", "sym": "Order.CouponId", "member": "property", "path": "src/Shop.Api/Models/", "file": "Order.cs", "line": 8, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 15, "lines": [{"n": 8, "t": "+", "c": "public Guid? CouponId { get; init; }"}], "project": "Shop.Api"}, {"id": "pricingcalculator-calculatetotal", "kind": "changed", "sym": "PricingCalculator.CalculateTotal()", "member": "method", "path": "src/Shop.Api/Pricing/", "file": "PricingCalculator.cs", "line": 10, "test": false, "adds": 4, "dels": 2, "layer": 3, "order": 13, "lines": [{"n": 10, "t": "-", "c": "public decimal CalculateTotal(Cart cart)"}, {"n": 10, "t": "+", "c": "public decimal CalculateTotal(Cart cart, Coupon? coupon = null)", "id": "L10"}, {"n": 11, "t": " ", "c": "{"}, {"n": 12, "t": " ", "c": "    var subtotal = cart.Items.Sum(i => i.Price * i.Quantity);"}, {"n": 13, "t": "-", "c": "    return subtotal + Shipping(subtotal);"}, {"n": 13, "t": "+", "c": "    var discount = coupon is null ? 0m : Math.Round(subtotal * coupon.PercentOff / 100m, 2);"}, {"n": 14, "t": "+", "c": "    var discounted = Math.Max(0m, subtotal - discount);"}, {"n": 15, "t": "+", "c": "    return discounted + Shipping(discounted);", "id": "L15"}, {"n": 16, "t": " ", "c": "}"}], "project": "Shop.Api"}, {"id": "pricingcalculator-shipping", "kind": "context", "sym": "PricingCalculator.Shipping()", "member": "method", "path": "src/Shop.Api/Pricing/", "file": "PricingCalculator.cs", "line": 18, "test": false, "adds": 0, "dels": 0, "layer": 4, "order": 14, "lines": [{"n": 18, "t": " ", "c": "public decimal Shipping(decimal subtotal) =>"}, {"n": 19, "t": " ", "c": "    subtotal >= FreeShippingThreshold ? 0m : FlatShipping;"}], "project": "Shop.Api"}, {"id": "program-cs-top-level", "kind": "changed", "sym": "Program.cs (top-level)", "member": "startup code", "path": "src/Shop.Api/", "file": "Program.cs", "line": 5, "entry": "Program start", "test": false, "adds": 3, "dels": 0, "layer": 0, "order": 20, "lines": [{"n": 5, "t": " ", "c": "var builder = WebApplication.CreateBuilder(args);"}, {"n": 6, "t": " ", "c": ""}, {"n": 7, "t": " ", "c": "builder.Services.AddControllers();"}, {"n": 8, "t": " ", "c": "builder.Services.AddSingleton<ICartRepository, InMemoryCartRepository>();"}, {"n": 9, "t": " ", "c": "builder.Services.AddSingleton<IOrderRepository, InMemoryOrderRepository>();"}, {"n": 10, "t": " ", "c": "builder.Services.AddSingleton<PricingCalculator>();"}, {"n": 11, "t": "+", "c": "builder.Services.AddSingleton<ICouponRepository, InMemoryCouponRepository>();", "id": "L11"}, {"n": 12, "t": "+", "c": "builder.Services.AddSingleton(TimeProvider.System);"}, {"n": 13, "t": "+", "c": "builder.Services.AddScoped<ICouponService, CouponService>();", "id": "L13"}, {"n": 14, "t": " ", "c": "builder.Services.AddScoped<ICheckoutService, CheckoutService>();"}, {"n": 15, "t": " ", "c": ""}, {"n": 16, "t": "\u2026", "c": "3 unchanged lines"}, {"n": 19, "t": " ", "c": "app.Run();"}], "project": "Shop.Api"}, {"id": "checkoutservice-coupons", "kind": "new", "sym": "CheckoutService._coupons", "member": "field", "path": "src/Shop.Api/Services/", "file": "CheckoutService.cs", "line": 12, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 5, "lines": [{"n": 12, "t": "+", "c": "private readonly ICouponService _coupons;"}], "project": "Shop.Api"}, {"id": "checkoutservice-constructor", "kind": "changed", "sym": "CheckoutService constructor", "member": "constructor", "path": "src/Shop.Api/Services/", "file": "CheckoutService.cs", "line": 14, "test": false, "adds": 2, "dels": 1, "layer": 2, "order": 23, "lines": [{"n": 13, "t": "-", "c": "public CheckoutService(ICartRepository carts, IOrderRepository orders, PricingCalculator pricing)"}, {"n": 14, "t": "+", "c": "public CheckoutService(ICartRepository carts, IOrderRepository orders, PricingCalculator pricing, ICouponService coupons)"}, {"n": 15, "t": " ", "c": "{"}, {"n": 16, "t": " ", "c": "    _carts = carts;"}, {"n": 17, "t": " ", "c": "    _orders = orders;"}, {"n": 18, "t": " ", "c": "    _pricing = pricing;"}, {"n": 19, "t": "+", "c": "    _coupons = coupons;", "id": "L19"}, {"n": 20, "t": " ", "c": "}"}], "project": "Shop.Api"}, {"id": "checkoutservice-placeorderasync", "kind": "changed", "sym": "CheckoutService.PlaceOrderAsync()", "member": "method", "path": "src/Shop.Api/Services/", "file": "CheckoutService.cs", "line": 22, "test": false, "adds": 7, "dels": 1, "layer": 2, "order": 2, "lines": [{"n": 22, "t": " ", "c": "public async Task<Order> PlaceOrderAsync(string userId, CheckoutRequest request)"}, {"n": 23, "t": " ", "c": "{"}, {"n": 24, "t": " ", "c": "    var cart = await _carts.GetAsync(userId);"}, {"n": 25, "t": " ", "c": "    if (cart.Items.Count == 0)"}, {"n": 26, "t": " ", "c": "        throw new InvalidOperationException(\"Cart is empty\");"}, {"n": 27, "t": " ", "c": ""}, {"n": 26, "t": "-", "c": "    var total = _pricing.CalculateTotal(cart);"}, {"n": 28, "t": "+", "c": "    Coupon? coupon = null;", "id": "L28"}, {"n": 29, "t": "+", "c": "    if (!string.IsNullOrWhiteSpace(request.CouponCode))", "id": "L29"}, {"n": 30, "t": "+", "c": "        coupon = await _coupons.ValidateAsync(request.CouponCode);", "id": "L30"}, {"n": 31, "t": " ", "c": ""}, {"n": 32, "t": "+", "c": "    var total = _pricing.CalculateTotal(cart, coupon);", "id": "L32"}, {"n": 33, "t": " ", "c": "    var order = await _orders.CreateAsync(new Order"}, {"n": 34, "t": " ", "c": "    {"}, {"n": 35, "t": " ", "c": "        UserId = userId,"}, {"n": 36, "t": " ", "c": "        Total = total,"}, {"n": 37, "t": "+", "c": "        CouponId = coupon?.Id,", "id": "L37"}, {"n": 38, "t": " ", "c": "        PlacedAt = DateTimeOffset.UtcNow,"}, {"n": 39, "t": " ", "c": "    });"}, {"n": 40, "t": " ", "c": ""}, {"n": 41, "t": "+", "c": "    if (coupon is not null)"}, {"n": 42, "t": "+", "c": "        _coupons.RecordUseAsync(coupon.Id);", "id": "L42"}, {"n": 43, "t": " ", "c": ""}, {"n": 44, "t": " ", "c": "    await _carts.ClearAsync(userId);"}, {"n": 45, "t": " ", "c": "    return order;"}, {"n": 46, "t": " ", "c": "}"}], "project": "Shop.Api"}, {"id": "icouponservice-validateasync", "kind": "new", "sym": "ICouponService.ValidateAsync()", "member": "interface method", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 8, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 6, "lines": [{"n": 8, "t": "+", "c": "Task<Coupon> ValidateAsync(string code);", "id": "L8"}], "project": "Shop.Api"}, {"id": "icouponservice-recorduseasync", "kind": "new", "sym": "ICouponService.RecordUseAsync()", "member": "interface method", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 9, "test": false, "adds": 1, "dels": 0, "layer": 3, "order": 16, "lines": [{"n": 9, "t": "+", "c": "Task RecordUseAsync(Guid couponId);", "id": "L9"}], "project": "Shop.Api"}, {"id": "couponservice-coupons", "kind": "new", "sym": "CouponService._coupons", "member": "field", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 14, "test": false, "adds": 1, "dels": 0, "layer": 5, "order": 11, "lines": [{"n": 14, "t": "+", "c": "private readonly ICouponRepository _coupons;"}], "project": "Shop.Api"}, {"id": "couponservice-clock", "kind": "new", "sym": "CouponService._clock", "member": "field", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 15, "test": false, "adds": 1, "dels": 0, "layer": 5, "order": 12, "lines": [{"n": 15, "t": "+", "c": "private readonly TimeProvider _clock;"}], "project": "Shop.Api"}, {"id": "couponservice-constructor", "kind": "new", "sym": "CouponService constructor", "member": "constructor", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 17, "test": false, "adds": 5, "dels": 0, "layer": 1, "order": 21, "lines": [{"n": 17, "t": "+", "c": "public CouponService(ICouponRepository coupons, TimeProvider clock)"}, {"n": 18, "t": "+", "c": "{"}, {"n": 19, "t": "+", "c": "    _coupons = coupons;", "id": "L19"}, {"n": 20, "t": "+", "c": "    _clock = clock;", "id": "L20"}, {"n": 21, "t": "+", "c": "}"}], "project": "Shop.Api"}, {"id": "couponservice-validateasync", "kind": "new", "sym": "CouponService.ValidateAsync()", "member": "method", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 23, "test": false, "adds": 10, "dels": 0, "layer": 4, "order": 7, "lines": [{"n": 23, "t": "+", "c": "public async Task<Coupon> ValidateAsync(string code)", "id": "L23"}, {"n": 24, "t": "+", "c": "{"}, {"n": 25, "t": "+", "c": "    var coupon = await _coupons.FindByCodeAsync(code.Trim())", "id": "L25"}, {"n": 26, "t": "+", "c": "        ?? throw new KeyNotFoundException($\"Coupon '{code}' not found\");"}, {"n": 27, "t": " ", "c": ""}, {"n": 28, "t": "+", "c": "    if (coupon.ExpiresAt < _clock.GetUtcNow())", "id": "L28"}, {"n": 29, "t": "+", "c": "        throw new InvalidOperationException(\"Coupon has expired\");"}, {"n": 30, "t": "+", "c": "    if (coupon.Uses >= coupon.MaxUses)"}, {"n": 31, "t": "+", "c": "        throw new InvalidOperationException(\"Coupon has been used up\");"}, {"n": 32, "t": " ", "c": ""}, {"n": 33, "t": "+", "c": "    return coupon;"}, {"n": 34, "t": "+", "c": "}"}], "project": "Shop.Api"}, {"id": "couponservice-recorduseasync", "kind": "new", "sym": "CouponService.RecordUseAsync()", "member": "method", "path": "src/Shop.Api/Services/", "file": "CouponService.cs", "line": 36, "test": false, "adds": 1, "dels": 0, "layer": 4, "order": 17, "lines": [{"n": 36, "t": "+", "c": "public Task RecordUseAsync(Guid couponId) => _coupons.IncrementUsesAsync(couponId);", "id": "L36"}], "project": "Shop.Api"}, {"id": "icheckoutservice-placeorderasync", "kind": "context", "sym": "ICheckoutService.PlaceOrderAsync()", "member": "interface method", "path": "src/Shop.Api/Services/", "file": "ICheckoutService.cs", "line": 7, "test": false, "adds": 0, "dels": 0, "layer": 1, "order": 1, "lines": [{"n": 7, "t": " ", "c": "Task<Order> PlaceOrderAsync(string userId, CheckoutRequest request);", "id": "L7"}], "project": "Shop.Api"}, {"id": "pricingcalculatortests-addsflatshippingunderthreshold", "kind": "context", "sym": "PricingCalculatorTests.AddsFlatShippingUnderThreshold()", "member": "method", "path": "tests/Shop.Tests/", "file": "PricingCalculatorTests.cs", "line": 9, "entry": "Test", "test": true, "adds": 0, "dels": 0, "layer": 0, "order": 36, "lines": [{"n": 9, "t": " ", "c": "[Fact]"}, {"n": 10, "t": " ", "c": "public void AddsFlatShippingUnderThreshold()"}, {"n": 11, "t": " ", "c": "{"}, {"n": 12, "t": "\u2026", "c": "3 unchanged lines"}, {"n": 15, "t": " ", "c": "    var total = new PricingCalculator().CalculateTotal(cart);", "id": "L15"}, {"n": 16, "t": "\u2026", "c": "2 unchanged lines"}, {"n": 18, "t": " ", "c": "}"}], "project": "Shop.Tests"}, {"id": "couponservicetests-rejectsexpiredcoupon", "kind": "new", "sym": "CouponServiceTests.RejectsExpiredCoupon()", "member": "method", "path": "tests/Shop.Tests/", "file": "CouponServiceTests.cs", "line": 14, "entry": "Test", "test": true, "adds": 8, "dels": 0, "layer": 0, "order": 30, "lines": [{"n": 14, "t": "+", "c": "[Fact]"}, {"n": 15, "t": "+", "c": "public async Task RejectsExpiredCoupon()"}, {"n": 16, "t": "+", "c": "{"}, {"n": 17, "t": "+", "c": "    var clock = new FakeTimeProvider(DateTimeOffset.Parse(\"2025-01-02\"));"}, {"n": 18, "t": "+", "c": "    var service = new CouponService(Repo(\"SAVE10\", expires: \"2025-01-01\"), clock);"}, {"n": 19, "t": "+", "c": ""}, {"n": 20, "t": "+", "c": "    await Assert.ThrowsAsync<InvalidOperationException>(() => service.ValidateAsync(\"SAVE10\"));", "id": "L19"}, {"n": 21, "t": "+", "c": "}"}], "project": "Shop.Tests"}, {"id": "couponservicetests-rejectsunknowncode", "kind": "new", "sym": "CouponServiceTests.RejectsUnknownCode()", "member": "method", "path": "tests/Shop.Tests/", "file": "CouponServiceTests.cs", "line": 24, "entry": "Test", "test": true, "adds": 7, "dels": 0, "layer": 0, "order": 31, "lines": [{"n": 24, "t": "+", "c": "[Fact]"}, {"n": 25, "t": "+", "c": "public async Task RejectsUnknownCode()"}, {"n": 26, "t": "+", "c": "{"}, {"n": 27, "t": "+", "c": "    var service = new CouponService(Repo(), new FakeTimeProvider());"}, {"n": 28, "t": "+", "c": ""}, {"n": 29, "t": "+", "c": "    await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ValidateAsync(\"NOPE\"));", "id": "L29"}, {"n": 30, "t": "+", "c": "}"}], "project": "Shop.Tests"}, {"id": "couponservicetests-recorduseincrementsuses", "kind": "new", "sym": "CouponServiceTests.RecordUseIncrementsUses()", "member": "method", "path": "tests/Shop.Tests/", "file": "CouponServiceTests.cs", "line": 33, "entry": "Test", "test": true, "adds": 10, "dels": 0, "layer": 0, "order": 32, "lines": [{"n": 33, "t": "+", "c": "[Fact]"}, {"n": 34, "t": "+", "c": "public async Task RecordUseIncrementsUses()"}, {"n": 35, "t": "+", "c": "{"}, {"n": 36, "t": "+", "c": "    var repo = Repo(\"SAVE10\");"}, {"n": 37, "t": "+", "c": "    var service = new CouponService(repo, new FakeTimeProvider());"}, {"n": 38, "t": "+", "c": ""}, {"n": 39, "t": "+", "c": "    await service.RecordUseAsync(\"SAVE10\");", "id": "L39"}, {"n": 40, "t": "+", "c": ""}, {"n": 41, "t": "+", "c": "    Assert.Equal(1, (await repo.FindByCodeAsync(\"SAVE10\"))!.Uses);"}, {"n": 42, "t": "+", "c": "}"}], "project": "Shop.Tests"}, {"id": "checkoutservicetests-appliescoupondiscount", "kind": "new", "sym": "CheckoutServiceTests.AppliesCouponDiscount()", "member": "method", "path": "tests/Shop.Tests/", "file": "CheckoutServiceTests.cs", "line": 12, "entry": "Test", "test": true, "adds": 10, "dels": 0, "layer": 0, "order": 33, "lines": [{"n": 12, "t": "+", "c": "[Fact]"}, {"n": 13, "t": "+", "c": "public async Task AppliesCouponDiscount()"}, {"n": 14, "t": "+", "c": "{"}, {"n": 15, "t": "+", "c": "    var service = Build(coupon: \"SAVE10\");"}, {"n": 16, "t": "+", "c": ""}, {"n": 17, "t": "+", "c": "    var order = await service.PlaceOrderAsync(\"u1\", new CheckoutRequest { CouponCode = \"SAVE10\" });", "id": "L17"}, {"n": 18, "t": "+", "c": ""}, {"n": 19, "t": "+", "c": "    Assert.Equal(\"SAVE10\", order.CouponId);"}, {"n": 20, "t": "+", "c": "    Assert.Equal(90m, order.Total);"}, {"n": 21, "t": "+", "c": "}"}], "project": "Shop.Tests"}, {"id": "checkoutservicetests-recordsusageafterorder", "kind": "new", "sym": "CheckoutServiceTests.RecordsUsageAfterOrder()", "member": "method", "path": "tests/Shop.Tests/", "file": "CheckoutServiceTests.cs", "line": 24, "entry": "Test", "test": true, "adds": 10, "dels": 0, "layer": 0, "order": 34, "lines": [{"n": 24, "t": "+", "c": "[Fact]"}, {"n": 25, "t": "+", "c": "public async Task RecordsUsageAfterOrder()"}, {"n": 26, "t": "+", "c": "{"}, {"n": 27, "t": "+", "c": "    var coupons = new SpyCouponService();"}, {"n": 28, "t": "+", "c": "    var service = Build(coupons);"}, {"n": 29, "t": "+", "c": ""}, {"n": 30, "t": "+", "c": "    await service.PlaceOrderAsync(\"u1\", new CheckoutRequest { CouponCode = \"SAVE10\" });", "id": "L30"}, {"n": 31, "t": "+", "c": ""}, {"n": 32, "t": "+", "c": "    Assert.Equal(new[] { \"SAVE10\" }, coupons.Used);"}, {"n": 33, "t": "+", "c": "}"}], "project": "Shop.Tests"}, {"id": "pricingcalculatortests-appliespercentdiscount", "kind": "changed", "sym": "PricingCalculatorTests.AppliesPercentDiscount()", "member": "method", "path": "tests/Shop.Tests/", "file": "PricingCalculatorTests.cs", "line": 20, "entry": "Test", "test": true, "adds": 10, "dels": 0, "layer": 0, "order": 35, "lines": [{"n": 20, "t": "+", "c": "[Fact]"}, {"n": 21, "t": "+", "c": "public void AppliesPercentDiscount()"}, {"n": 22, "t": "+", "c": "{"}, {"n": 23, "t": "+", "c": "    var cart = CartWorth(100m);"}, {"n": 24, "t": "+", "c": "    var coupon = new Coupon(Guid.NewGuid(), \"SAVE10\", 10, DateTimeOffset.MaxValue, 5, 0);"}, {"n": 25, "t": "+", "c": ""}, {"n": 26, "t": "+", "c": "    var total = new PricingCalculator().CalculateTotal(cart, coupon);", "id": "L26"}, {"n": 27, "t": "+", "c": ""}, {"n": 28, "t": "+", "c": "    Assert.Equal(95m, total);"}, {"n": 29, "t": "+", "c": "}"}], "project": "Shop.Tests"}], "edges": [{"from": "checkoutcontroller-checkout:L19", "to": "icheckoutservice-placeorderasync", "label": "calls"}, {"from": "icheckoutservice-placeorderasync:L7", "to": "checkoutservice-placeorderasync", "label": "implemented by"}, {"from": "checkoutservice-placeorderasync:L28", "to": "coupon", "label": "uses"}, {"from": "checkoutservice-placeorderasync:L29", "to": "checkoutrequest-couponcode", "label": "reads"}, {"from": "checkoutservice-placeorderasync:L30", "to": "checkoutservice-coupons", "label": "reads"}, {"from": "checkoutservice-placeorderasync:L30", "to": "icouponservice-validateasync", "label": "calls"}, {"from": "checkoutservice-placeorderasync:L32", "to": "pricingcalculator-calculatetotal", "label": "calls"}, {"from": "checkoutservice-placeorderasync:L37", "to": "order-couponid", "label": "sets"}, {"from": "checkoutservice-placeorderasync:L42", "to": "icouponservice-recorduseasync", "label": "calls"}, {"from": "icouponservice-validateasync:L8", "to": "coupon", "label": "uses"}, {"from": "icouponservice-validateasync:L8", "to": "couponservice-validateasync", "label": "implemented by"}, {"from": "couponservice-validateasync:L23", "to": "coupon", "label": "uses"}, {"from": "couponservice-validateasync:L25", "to": "icouponrepository-findbycodeasync", "label": "calls"}, {"from": "couponservice-validateasync:L25", "to": "couponservice-coupons", "label": "reads"}, {"from": "couponservice-validateasync:L28", "to": "couponservice-clock", "label": "reads"}, {"from": "icouponrepository-findbycodeasync:L7", "to": "coupon", "label": "uses"}, {"from": "icouponrepository-findbycodeasync:L7", "to": "inmemorycouponrepository-findbycodeasync", "label": "implemented by"}, {"from": "inmemorycouponrepository-findbycodeasync:L15", "to": "coupon", "label": "uses"}, {"from": "inmemorycouponrepository-findbycodeasync:L16", "to": "inmemorycouponrepository-bycode", "label": "reads"}, {"from": "inmemorycouponrepository-bycode:L13", "to": "coupon", "label": "uses"}, {"from": "pricingcalculator-calculatetotal:L10", "to": "coupon", "label": "uses"}, {"from": "pricingcalculator-calculatetotal:L15", "to": "pricingcalculator-shipping", "label": "calls"}, {"from": "icouponservice-recorduseasync:L9", "to": "couponservice-recorduseasync", "label": "implemented by"}, {"from": "couponservice-recorduseasync:L36", "to": "couponservice-coupons", "label": "reads"}, {"from": "couponservice-recorduseasync:L36", "to": "icouponrepository-incrementusesasync", "label": "calls"}, {"from": "icouponrepository-incrementusesasync:L8", "to": "inmemorycouponrepository-incrementusesasync", "label": "implemented by"}, {"from": "inmemorycouponrepository-incrementusesasync:L20", "to": "coupon", "label": "uses"}, {"from": "inmemorycouponrepository-incrementusesasync:L20", "to": "inmemorycouponrepository-bycode", "label": "reads"}, {"from": "program-cs-top-level:L11", "to": "inmemorycouponrepository-findbycodeasync", "label": "registers"}, {"from": "program-cs-top-level:L13", "to": "couponservice-constructor", "label": "registers"}, {"from": "couponservice-constructor:L19", "to": "couponservice-coupons", "label": "sets"}, {"from": "couponservice-constructor:L20", "to": "couponservice-clock", "label": "sets"}, {"from": "cartcontroller-gettotal:L24", "to": "pricingcalculator-calculatetotal", "label": "calls"}, {"from": "checkoutservice-constructor:L19", "to": "checkoutservice-coupons", "label": "sets"}, {"from": "pricingcalculatortests-addsflatshippingunderthreshold:L15", "to": "pricingcalculator-calculatetotal", "label": "calls"}, {"from": "couponservicetests-rejectsexpiredcoupon:L19", "to": "couponservice-validateasync", "label": "calls"}, {"from": "couponservicetests-rejectsunknowncode:L29", "to": "couponservice-validateasync", "label": "calls"}, {"from": "couponservicetests-recorduseincrementsuses:L39", "to": "couponservice-recorduseasync", "label": "calls"}, {"from": "checkoutservicetests-appliescoupondiscount:L17", "to": "checkoutservice-placeorderasync", "label": "calls"}, {"from": "checkoutservicetests-recordsusageafterorder:L30", "to": "checkoutservice-placeorderasync", "label": "calls"}, {"from": "pricingcalculatortests-appliespercentdiscount:L26", "to": "pricingcalculator-calculatetotal", "label": "calls"}], "steps": [{"title": "Changed: CheckoutService.PlaceOrderAsync()", "primary": "checkoutservice-placeorderasync", "nodes": ["checkoutservice-placeorderasync", "coupon", "checkoutrequest-couponcode", "checkoutservice-coupons", "order-couponid", "checkoutservice-constructor", "icheckoutservice-placeorderasync", "icouponservice-validateasync", "pricingcalculator-calculatetotal", "icouponservice-recorduseasync", "checkoutcontroller-checkout", "checkoutservicetests-appliescoupondiscount", "checkoutservicetests-recordsusageafterorder"], "body": ["Changed method in `CheckoutService.cs` (+7 \u22121).", "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 here.", "Calls `ICouponService.ValidateAsync()`, `PricingCalculator.CalculateTotal()` and `ICouponService.RecordUseAsync()`.", "Also in this step: `Coupon` (new record), `CheckoutRequest.CouponCode` (new property), `CheckoutService._coupons` (new field), `Order.CouponId` (new property), `CheckoutService constructor` (changed constructor).", "Covered by `CheckoutServiceTests.AppliesCouponDiscount()`, `CheckoutServiceTests.RecordsUsageAfterOrder()`."], "checks": [{"ok": false, "text": "Compiler warning CS4014 on line 42: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call."}, {"ok": true, "text": "`CheckoutService constructor`: All 4 injected services are registered for dependency injection."}, {"ok": true, "text": "Reached by 2 tests in `tests/Shop.Tests`."}]}, {"title": "New: CouponService.ValidateAsync()", "primary": "couponservice-validateasync", "nodes": ["couponservice-validateasync", "icouponservice-validateasync", "couponservice-coupons", "couponservice-clock", "couponservice-constructor", "coupon", "icouponrepository-findbycodeasync", "couponservicetests-rejectsexpiredcoupon", "couponservicetests-rejectsunknowncode"], "body": ["New method in `CouponService.cs` (+10).", "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 `CheckoutService.PlaceOrderAsync()` \u2192 `ICouponService.ValidateAsync()` \u2192 here.", "Calls `ICouponRepository.FindByCodeAsync()`.", "Uses `Coupon`.", "Also in this step: `ICouponService.ValidateAsync()` (new interface method), `CouponService._coupons` (new field), `CouponService._clock` (new field), `CouponService constructor` (new constructor).", "Covered by `CouponServiceTests.RejectsExpiredCoupon()`, `CouponServiceTests.RejectsUnknownCode()`."], "checks": [{"ok": false, "text": "Can now throw `InvalidOperationException`, `KeyNotFoundException`. `CheckoutService.PlaceOrderAsync()` doesn't catch them, so check where they surface."}, {"ok": true, "text": "`CouponService constructor`: Both injected services are registered for dependency injection."}, {"ok": true, "text": "Reached by 2 tests in `tests/Shop.Tests`."}]}, {"title": "Changed: PricingCalculator.CalculateTotal()", "primary": "pricingcalculator-calculatetotal", "nodes": ["pricingcalculator-calculatetotal", "checkoutservice-placeorderasync", "coupon", "pricingcalculator-shipping", "cartcontroller-gettotal", "pricingcalculatortests-addsflatshippingunderthreshold", "pricingcalculatortests-appliespercentdiscount"], "body": ["Changed method in `PricingCalculator.cs` (+4 \u22122). The signature changed.", "Reached from `HTTP GET /api/Cart/{userId}/total`: `CartController.GetTotal()` \u2192 here.", "Called from `CheckoutService.PlaceOrderAsync()` and `PricingCalculatorTests.AddsFlatShippingUnderThreshold()`.", "Calls `PricingCalculator.Shipping()`.", "Uses `Coupon`.", "Covered by `PricingCalculatorTests.AppliesPercentDiscount()`."], "checks": [{"ok": false, "text": "Signature changed. 2 call sites still use it unchanged: `CartController.GetTotal()` (CartController.cs:24), `PricingCalculatorTests.AddsFlatShippingUnderThreshold()` (PricingCalculatorTests.cs:15). Check they still behave as intended."}, {"ok": false, "text": "Existing tests reach this (`PricingCalculatorTests.AddsFlatShippingUnderThreshold()`), but none were added or changed for the new behavior."}, {"ok": true, "text": "Reached by 1 test in `tests/Shop.Tests`."}]}, {"title": "New: CouponService.RecordUseAsync()", "primary": "couponservice-recorduseasync", "nodes": ["couponservice-recorduseasync", "icouponservice-recorduseasync", "couponservice-coupons", "icouponrepository-incrementusesasync", "couponservicetests-recorduseincrementsuses"], "body": ["New method in `CouponService.cs` (+1).", "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 `ICheckoutService.PlaceOrderAsync()` \u2192 `CheckoutService.PlaceOrderAsync()` \u2192 `ICouponService.RecordUseAsync()` \u2192 here.", "Calls `ICouponRepository.IncrementUsesAsync()`.", "Also in this step: `ICouponService.RecordUseAsync()` (new interface method).", "Covered by `CouponServiceTests.RecordUseIncrementsUses()`."], "checks": [{"ok": true, "text": "Reached by 1 test in `tests/Shop.Tests`."}]}, {"title": "New: InMemoryCouponRepository.IncrementUsesAsync()", "primary": "inmemorycouponrepository-incrementusesasync", "nodes": ["inmemorycouponrepository-incrementusesasync", "icouponrepository-findbycodeasync", "inmemorycouponrepository-findbycodeasync", "inmemorycouponrepository-bycode", "icouponrepository-incrementusesasync", "coupon"], "body": ["New method in `ICouponRepository.cs` (+7).", "Reached from `HTTP POST /api/Checkout`: `CheckoutController.Checkout()` \u2192 \u2026 \u2192 `CouponService.RecordUseAsync()` \u2192 `ICouponRepository.IncrementUsesAsync()` \u2192 here.", "Called from `CouponService.ValidateAsync()`.", "Uses `Coupon`.", "Also in this step: `ICouponRepository.FindByCodeAsync()` (new interface method), `InMemoryCouponRepository.FindByCodeAsync()` (new method), `InMemoryCouponRepository._byCode` (new field), `ICouponRepository.IncrementUsesAsync()` (new interface method)."], "checks": [{"ok": false, "text": "No test reaches this within 3 calls."}, {"ok": false, "text": "`InMemoryCouponRepository.FindByCodeAsync()`: No test reaches this within 3 calls."}]}, {"title": "Changed: Program.cs (top-level)", "primary": "program-cs-top-level", "nodes": ["program-cs-top-level", "inmemorycouponrepository-findbycodeasync", "couponservice-constructor"], "body": ["Changed startup code in `Program.cs` (+3 \u22120).", "This is where execution starts: `Program start`.", "Registers `InMemoryCouponRepository` and `CouponService` for dependency injection."], "checks": []}], "warnings": [], "generator": "reviewgraph 0.1"};
+
+const $ = s => document.querySelector(s);
+const canvas = $("#canvas"), world = $("#world"), svg = $("#edges");
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const md = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const KIND = {new:"New", changed:"Changed", context:"Context"};
+
+/* ---------- C# highlighting (display only) ---------- */
+const KW = new Set(("abstract as async await base bool break byte case catch char checked class const continue decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in init int interface internal is lock long namespace new null object operator out override params private protected public readonly record ref required return sbyte sealed short sizeof stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using var virtual void volatile when where while with yield get set value nameof not and or").split(" "));
+function hl(src){
+  const re = /(\/\/.*$)|(\$?@?"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)')|(\b\d+(?:\.\d+)?[mMdDfFLuU]?\b)|([A-Za-z_][\w]*)/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(src))){
+    out += esc(src.slice(last, m.index));
+    const t = m[0];
+    if (m[1]) out += `<span class="tk-c">${esc(t)}</span>`;
+    else if (m[2]) out += `<span class="tk-s">${esc(t)}</span>`;
+    else if (m[3]) out += `<span class="tk-n">${t}</span>`;
+    else if (KW.has(t)) out += `<span class="tk-k">${t}</span>`;
+    else if (src[re.lastIndex] === "(") out += `<span class="tk-f">${t}</span>`;
+    else if (/^[A-Z]/.test(t)) out += `<span class="tk-t">${t}</span>`;
+    else out += t;
+    last = re.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+
+/* ---------- state ---------- */
+let GROUPS, D, NODES, EDGES, STEPS, byId, pos, home, nodeEls, pathEls, endEls, labelEls, stepOf;
+const cam = {x:0, y:0, k:1};
+let active = -1, showContext = true, z = 10;
+
+function load(data){
+  D = data; NODES = data.nodes; EDGES = data.edges; STEPS = data.steps;
+  byId = Object.fromEntries(NODES.map(n => [n.id, n]));
+  stepOf = {}; STEPS.forEach((s,i) => { if (!(s.primary in stepOf)) stepOf[s.primary] = i; });
+  [...world.querySelectorAll(".node,.edge-label,.group")].forEach(e => e.remove());
+  svg.innerHTML = ""; nodeEls = {}; pathEls = []; endEls = []; labelEls = [];
+  active = -1;
+  renderHeader();
+  buildNodes();
+  buildGroups();
+  buildEdges();
+  layout(); pos = structuredClone(home);
+  buildStepList();
+  drawNow(); applyCam(); setStep(-1, false);
+  requestAnimationFrame(() => fit(NODES.map(n=>n.id), false));
+}
+
+function renderHeader(){
+  const pr = D.pr, st = D.stats;
+  $("#repo").textContent = pr.repo;
+  $("#branch").textContent = `${pr.branch} → ${pr.base.split(" ")[0]}`;
+  $("#title").textContent = pr.title;
+  document.title = pr.title;
+  $("#prmeta").innerHTML = `<span><span class="a">+${st.adds}</span> <span class="d">−${st.dels}</span></span><span>${st.filesChanged} files</span><span>${st.changedNodes} changed · ${st.contextNodes} context</span>`;
+}
+
+function buildNodes(){
+  for (const n of NODES){
+    const el = document.createElement("div");
+    el.className = "node " + n.kind; el.dataset.id = n.id;
+    const stat = n.kind !== "context" ? `<span class="stat">${n.adds?`<span class="a">+${n.adds}</span>`:""}${n.dels?`<span class="d">−${n.dels}</span>`:""}</span>` : "";
+    const rows = n.lines.map(l => l.t === "…"
+      ? `<div class="row fold"><span class="ln"></span><span class="sg"></span><span class="code">⋯ ${esc(l.c)}</span></div>`
+      : `<div class="row ${l.t==="+"?"add":l.t==="-"?"del":""}"${l.id?` data-line="${l.id}"`:""}><span class="ln">${l.n}</span><span class="sg">${l.t===" "?"":l.t==="-"?"−":l.t}</span><span class="code">${hl(l.c)}</span></div>`).join("");
+    const pin = n.id in stepOf ? `<span class="step-pin">${stepOf[n.id]+1}</span>` : "";
+    const entry = n.entry ? `<div class="entry${n.entry==="Test"?" test":""}">${esc(n.entry)}</div>` : "";
+    el.innerHTML = `${pin}<span class="target-handle"></span>
+      <div class="node-head" title="${esc(n.path+n.file)}:${n.line}"><span class="badge ${n.kind}">${KIND[n.kind]}</span>
+        <div class="node-title"><span class="node-sym">${esc(n.sym)}</span><span class="node-path">${esc(n.member)} · ${esc(n.path)}<b>${esc(n.file)}</b></span></div>${stat}
+        <button class="expand" type="button" title="Expand to show full lines" aria-label="Expand card" aria-pressed="false"><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5l-4.5 4.5M2.5 13.5L7 9"/></svg></button></div>
+      ${entry}<div class="rows">${rows}</div>`;
+    world.appendChild(el);
+    nodeEls[n.id] = el;
+  }
+}
+
+const parse = ref => { const i = ref.indexOf(":"); return i < 0 ? {id:ref} : {id:ref.slice(0,i), line:ref.slice(i+1)}; };
+const SOFT = new Set(["reads","sets","uses","registers"]);
+function buildEdges(){
+  EDGES.forEach(e => {
+    const p = document.createElementNS("http://www.w3.org/2000/svg","path"); p.setAttribute("class","edge" + (SOFT.has(e.label) ? " soft" : "")); svg.appendChild(p); pathEls.push(p);
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle"); c.setAttribute("r","3.5"); c.setAttribute("class","edge-end"); svg.appendChild(c); endEls.push(c);
+    const l = document.createElement("div"); l.className = "edge-label"; l.textContent = e.label; world.appendChild(l); labelEls.push(l);
+    const s = parse(e.from);
+    const row = s.line && nodeEls[s.id]?.querySelector(`[data-line="${s.line}"]`);
+    if (row) row.classList.add("anchor");
+  });
+}
+
+/* ---------- deterministic layout: one column per call depth, rows in reading order ---------- */
+function rowY(id, line){
+  const el = nodeEls[id];
+  const r = line && el.querySelector(`[data-line="${line}"]`);
+  return r ? r.offsetTop + r.offsetHeight/2 : 22;
+}
+const GPAD = 28, GHEAD = 50, GGAP = 56;
+// Cards are grouped by project. Inside a group: one column per call depth, rows in reading order.
+function buildGroups(){
+  const names = [...new Set(NODES.map(n => n.project || ""))];
+  const first = {}; NODES.forEach(n => { const p = n.project || ""; first[p] = Math.min(first[p] ?? Infinity, n.layer * 1e4 + n.order); });
+  const testOnly = p => NODES.filter(n => (n.project || "") === p).every(n => n.test);
+  names.sort((a,b) => testOnly(a) - testOnly(b) || first[a] - first[b]);
+  GROUPS = names.map(name => {
+    const el = document.createElement("div"); el.className = "group";
+    el.innerHTML = name ? `<div class="group-title">${esc(name)}<small></small></div>` : "";
+    world.prepend(el);
+    return {name, el, ids:NODES.filter(n => (n.project || "") === name).map(n => n.id), x:0, y:0, w:0, h:0};
+  });
+}
+const groupOf = id => GROUPS.find(g => g.ids.includes(id));
+function layout(){
+  const GAPX = 100, GAPY = 32;
+  home = {}; let gy = 0;
+  for (const g of GROUPS){
+    const members = NODES.filter(n => g.ids.includes(n.id));
+    const layers = [...new Set(members.map(n => n.layer))].sort((a,b) => a-b);
+    const head = g.name ? GHEAD : GPAD;
+    let x = 0, maxB = 0;
+    for (const L of layers){
+      const col = members.filter(n => n.layer === L && visible(n.id)).sort((a,b) => a.order - b.order);
+      const w = Math.max(0, ...col.map(n => nodeEls[n.id].offsetWidth));
+      let bottom = -Infinity;
+      for (const n of col){
+        const ins = EDGES.map(e => ({e, s:parse(e.from)})).filter(({e,s}) => parse(e.to).id === n.id && home[s.id] && g.ids.includes(s.id) && byId[s.id].layer < L);
+        const want = ins.length ? ins.reduce((a,{e,s}) => a + home[s.id].y - gy - head + rowY(s.id, s.line), 0) / ins.length - 22 : 0;
+        const y = bottom === -Infinity ? Math.max(0, want) : Math.max(want, bottom + GAPY);
+        home[n.id] = {x: GPAD + x, y: gy + head + y};
+        bottom = y + nodeEls[n.id].offsetHeight; maxB = Math.max(maxB, bottom);
+      }
+      if (col.length) x += w + GAPX;
+    }
+    g.x = 0; g.y = gy; g.w = Math.max(320, x - GAPX + GPAD * 2); g.h = head + maxB + GPAD;
+    g.vis = members.some(n => visible(n.id));
+    if (g.vis) gy += g.h + GGAP;
+  }
+  for (const n of NODES) if (!home[n.id]) home[n.id] = {x:0, y:0};
+}
+// A card that grew (expand) must still fit its group; later groups slide down to make room.
+function growGroup(id){
+  const g = groupOf(id), el = nodeEls[id]; if (!g) return;
+  const p = pos[id], r = p.x + el.offsetWidth + GPAD - g.x, b = p.y + el.offsetHeight + GPAD - g.y;
+  const dw = Math.max(0, r - g.w), dh = Math.max(0, b - g.h);
+  g.w += dw; g.h += dh;
+  if (dh) for (const o of GROUPS) if (o !== g && o.vis && o.y > g.y){ o.y += dh; o.ids.forEach(i => pos[i].y += dh); }
+}
+function clampToGroup(id){
+  const g = groupOf(id), el = nodeEls[id], p = pos[id]; if (!g) return;
+  const top = g.y + (g.name ? GHEAD : GPAD);
+  p.x = Math.min(Math.max(p.x, g.x + GPAD), Math.max(g.x + GPAD, g.x + g.w - GPAD - el.offsetWidth));
+  p.y = Math.min(Math.max(p.y, top), Math.max(top, g.y + g.h - GPAD - el.offsetHeight));
+}
+
+/* ---------- drawing ---------- */
+function visible(id){ return showContext || byId[id].kind !== "context"; }
+function placeGroups(){
+  for (const g of GROUPS){
+    g.el.hidden = !g.vis || !g.name;
+    g.el.style.transform = `translate(${g.x}px,${g.y}px)`; g.el.style.width = g.w + "px"; g.el.style.height = g.h + "px";
+    const c = g.ids.filter(visible).length; const sm = g.el.querySelector("small"); if (sm) sm.textContent = `${c} card${c===1?"":"s"}`;
+  }
+}
+function placeNodes(){ placeGroups(); for (const id in nodeEls){ nodeEls[id].style.transform = `translate(${pos[id].x}px,${pos[id].y}px)`; nodeEls[id].hidden = !visible(id); } }
+function drawEdges(){
+  EDGES.forEach((e,i) => {
+    const s = parse(e.from), t = parse(e.to);
+    const show = visible(s.id) && visible(t.id);
+    pathEls[i].style.display = endEls[i].style.display = show ? "" : "none"; labelEls[i].hidden = !show;
+    if (!show) return;
+    const se = nodeEls[s.id], te = nodeEls[t.id], sw = se.offsetWidth, tw = te.offsetWidth;
+    const sx0 = pos[s.id].x, tx0 = pos[t.id].x;
+    let sSide, tSide;
+    if (tx0 >= sx0 + sw * .6) { sSide = 1; tSide = -1; }
+    else if (tx0 + tw <= sx0 + sw * .4) { sSide = -1; tSide = 1; }
+    else { sSide = 1; tSide = 1; }
+    const sx = sSide > 0 ? sx0 + sw : sx0, sy = pos[s.id].y + rowY(s.id, s.line);
+    const tx = tSide > 0 ? tx0 + tw : tx0, ty = pos[t.id].y + rowY(t.id, t.line);
+    const c = Math.max(60, Math.abs(tx - sx) * .45);
+    const c1x = sx + sSide * c, c2x = tx + tSide * c;
+    pathEls[i].setAttribute("d", `M${sx},${sy} C${c1x},${sy} ${c2x},${ty} ${tx},${ty}`);
+    endEls[i].setAttribute("cx", tx); endEls[i].setAttribute("cy", ty);
+    labelEls[i].style.left = (.125*sx + .375*c1x + .375*c2x + .125*tx) + "px";
+    labelEls[i].style.top = (.5*sy + .5*ty) + "px";
+    const row = s.line && se.querySelector(`[data-line="${s.line}"]`);
+    if (row) row.classList.toggle("l", sSide < 0);
+    te.querySelector(".target-handle").classList.toggle("r", tSide > 0 && !t.line);
+  });
+}
+let raf = 0;
+function draw(){ if (raf) return; raf = requestAnimationFrame(() => { raf = 0; placeNodes(); drawEdges(); }); }
+function drawNow(){ placeNodes(); drawEdges(); }
+function applyCam(){
+  world.style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.k})`;
+  canvas.style.backgroundSize = `${20*cam.k}px ${20*cam.k}px`;
+  canvas.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+  $("#zread").textContent = Math.round(cam.k*100) + "%";
+}
+function animate(fn){
+  if (reduce) { fn(); return; }
+  canvas.classList.add("anim"); fn();
+  clearTimeout(animate.t); animate.t = setTimeout(() => canvas.classList.remove("anim"), 520);
+}
+function currentIds(){ return STEPS[active] ? STEPS[active].nodes : NODES.map(n=>n.id); }
+function fit(ids, anim = true){
+  ids = ids.filter(visible);
+  if (!ids.length) ids = NODES.map(n=>n.id).filter(visible);
+  if (!ids.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id => { const el = nodeEls[id];
+    x0 = Math.min(x0,pos[id].x); y0 = Math.min(y0,pos[id].y);
+    x1 = Math.max(x1,pos[id].x+el.offsetWidth); y1 = Math.max(y1,pos[id].y+el.offsetHeight); });
+  const r = canvas.getBoundingClientRect(), pad = r.width < 500 ? 24 : 60;
+  let k = Math.max(.12, Math.min(1.05, (r.width-pad*2)/(x1-x0), (r.height-pad*2-40)/(y1-y0)));
+  let cx = (x0+x1)/2, cy = (y0+y1)/2;
+  // A step should stay readable: if its cards don't fit, keep the zoom legible and centre the main card.
+  const st = STEPS[active], min = r.width < 500 ? .42 : .55;
+  if (st && ids.length > 1 && k < min && visible(st.primary)) {
+    k = min; const p = pos[st.primary], el = nodeEls[st.primary];
+    cx = p.x + el.offsetWidth/2; cy = Math.max(p.y + el.offsetHeight/2, y0 + (r.height/2 - pad)/k);
+  }
+  const go = () => { cam.k = k; cam.x = r.width/2 - cx*k; cam.y = r.height/2 - cy*k + 18; applyCam(); };
+  anim ? animate(go) : go();
+}
+function zoomAt(cx, cy, k){
+  k = Math.max(.12, Math.min(2, k));
+  const wx = (cx-cam.x)/cam.k, wy = (cy-cam.y)/cam.k;
+  cam.k = k; cam.x = cx - wx*k; cam.y = cy - wy*k; applyCam();
+}
+
+/* ---------- story ---------- */
+function buildStepList(){
+  $("#steplist").innerHTML = `<li><button data-i="-1"><span class="n">·</span><span class="t">Overview</span><span></span></button></li>` +
+    STEPS.map((s,i) => { const f = s.checks.filter(c => !c.ok).length;
+      return `<li><button data-i="${i}"><span class="n">${i+1}</span><span class="t">${esc(s.title)}</span><span class="flags" title="${f} things to check">${f?`${f} !`:""}</span></button></li>`; }).join("");
+}
+$("#steplist").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setStep(+b.dataset.i); });
+
+function chipFor(id){
+  const n = byId[id];
+  return `<button class="chip" data-node="${id}"><i class="${n.kind==="context"?"ctx":""}" style="${n.kind!=="context"?`background:var(--${n.kind})`:""}"></i><span>${esc(n.sym)}</span></button>`;
+}
+function setStep(i, anim = true){
+  active = i;
+  const st = STEPS[i], box = $("#step");
+  if (!st){
+    const changed = NODES.filter(n => n.kind !== "context");
+    box.innerHTML = `<div class="eyebrow">Overview</div><h2>${esc(D.pr.title)}</h2>
+      ${(D.overview||[]).map(p => `<p>${md(p)}</p>`).join("")}
+      ${D.warnings?.length ? `<h3>Analysis notes</h3><ul class="warnings">${D.warnings.map(w=>`<li>${md(w)}</li>`).join("")}</ul>` : ""}
+      <h3>Changed code</h3><div class="chips">${changed.map(n=>chipFor(n.id)).join("")}</div>
+      <h3>Generated</h3><p><code>${esc(D.pr.base)}</code> → <code>${esc(D.pr.head)}</code> · ${esc(D.generator)} · ${esc(D.pr.analysis)} analysis</p>`;
+  } else {
+    box.innerHTML = `<div class="eyebrow">Step ${i+1} of ${STEPS.length}</div><h2>${md(st.title)}</h2>${st.body.map(p => `<p>${md(p)}</p>`).join("")}
+      <h3>Cards in this step</h3><div class="chips">${st.nodes.map(chipFor).join("")}</div>
+      ${st.checks.length ? `<h3>Check this</h3><ul class="checks">${st.checks.map(c=>`<li class="${c.ok?"ok":""}"><span>${md(c.text)}</span></li>`).join("")}</ul>` : ""}`;
+  }
+  $("#steplist").querySelectorAll("button").forEach(b => {
+    if (+b.dataset.i === i) b.setAttribute("aria-current","step"); else b.removeAttribute("aria-current");
+  });
+  $("#prev").disabled = i < 0;
+  $("#next").disabled = i >= STEPS.length - 1;
+  $("#next").firstChild.textContent = i < 0 ? "Start walkthrough" : "Next";
+  const set = st ? new Set(st.nodes) : null;
+  for (const id in nodeEls){
+    const el = nodeEls[id];
+    el.classList.toggle("dim", !!set && !set.has(id));
+    el.classList.toggle("focus", !!set && set.has(id));
+    el.classList.toggle("primary", !!st && st.primary === id);
+  }
+  for (const g of GROUPS) g.el.classList.toggle("dim", !!set && !g.ids.some(i => set.has(i)));
+  world.querySelectorAll(".row.anchor.hot").forEach(r => r.classList.remove("hot"));
+  EDGES.forEach((e,k) => {
+    const s = parse(e.from), t = parse(e.to);
+    const on = !!set && set.has(s.id) && set.has(t.id);
+    const off = !!set && !on;
+    for (const el of [pathEls[k], endEls[k], labelEls[k]]) { el.classList.toggle("active", on); el.classList.toggle("dim", off); }
+    if (on && s.line) nodeEls[s.id].querySelector(`[data-line="${s.line}"]`)?.classList.add("hot");
+  });
+  $("#scroll").scrollTop = 0;
+  fit(currentIds(), anim);
+}
+$("#step").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  const id = c.dataset.node;
+  if (!visible(id)) { showContext = true; $("#ctx").setAttribute("aria-pressed","true"); drawNow(); }
+  fit([id]);
+  const el = nodeEls[id]; el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse");
+});
+$("#prev").onclick = () => setStep(Math.max(-1, active-1));
+$("#next").onclick = () => setStep(Math.min(STEPS.length-1, active+1));
+addEventListener("keydown", e => {
+  if (e.target.closest("input,textarea")) return;
+  if (e.key === "ArrowRight") setStep(Math.min(STEPS.length-1, active+1));
+  else if (e.key === "ArrowLeft") setStep(Math.max(-1, active-1));
+  else if (e.key === "f" || e.key === "F") fit(currentIds());
+});
+
+/* ---------- controls ---------- */
+const center = () => { const r = canvas.getBoundingClientRect(); return [r.width/2, r.height/2]; };
+$("#zin").onclick = () => animate(() => zoomAt(...center(), cam.k*1.25));
+$("#zout").onclick = () => animate(() => zoomAt(...center(), cam.k/1.25));
+$("#zfit").onclick = () => fit(currentIds());
+$("#relayout").onclick = () => { layout(); pos = structuredClone(home); drawNow(); fit(currentIds()); };
+$("#ctx").onclick = e => {
+  showContext = !showContext;
+  e.currentTarget.setAttribute("aria-pressed", String(showContext));
+  e.currentTarget.title = showContext ? "Hide context cards" : "Show context cards";
+  layout(); pos = structuredClone(home); drawNow(); fit(currentIds());
+};
+$("#loadbtn").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { load(JSON.parse(await f.text())); }
+  catch (err) { $("#step").innerHTML = `<div class="eyebrow">Could not open file</div><p>${esc(f.name)} is not a reviewgraph JSON file: ${esc(err.message)}</p>`; }
+  e.target.value = "";
+};
+
+/* ---------- pointer: drag cards, pan, pinch ---------- */
+const pts = new Map(); let mode = null;
+canvas.addEventListener("pointerdown", e => {
+  if (e.target.closest(".controls,.legend,.expand")) return;
+  pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pts.size === 2){
+    const [a,b] = [...pts.values()];
+    if (mode && mode.type === "node") nodeEls[mode.id].classList.remove("dragging");
+    mode = {type:"pinch", d:Math.hypot(a.x-b.x,a.y-b.y), k:cam.k};
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  const gt = e.target.closest(".group-title");
+  if (gt){
+    const g = GROUPS.find(x => x.el === gt.parentElement);
+    mode = {type:"group", g, sx:e.clientX, sy:e.clientY, ox:g.x, oy:g.y, from:g.ids.map(id => [id, pos[id].x, pos[id].y]), moved:false};
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  const head = e.target.closest(".node-head"), node = e.target.closest(".node");
+  if (head){
+    const id = node.dataset.id;
+    mode = {type:"node", id, sx:e.clientX, sy:e.clientY, ox:pos[id].x, oy:pos[id].y, moved:false};
+    node.style.zIndex = ++z; node.classList.add("dragging");
+  } else if (node){
+    mode = {type:"press", id:node.dataset.id, sx:e.clientX, sy:e.clientY, moved:false};
+    return;
+  } else {
+    mode = {type:"pan", sx:e.clientX, sy:e.clientY, ox:cam.x, oy:cam.y};
+    canvas.classList.add("panning");
+  }
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId) || !mode) return;
+  pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (mode.type === "pinch" && pts.size === 2){
+    const [a,b] = [...pts.values()], r = canvas.getBoundingClientRect();
+    zoomAt((a.x+b.x)/2 - r.left, (a.y+b.y)/2 - r.top, mode.k * Math.hypot(a.x-b.x,a.y-b.y) / mode.d);
+    return;
+  }
+  const dx = e.clientX - mode.sx, dy = e.clientY - mode.sy;
+  if (Math.abs(dx)+Math.abs(dy) > 4) mode.moved = true;
+  if (mode.type === "node"){ pos[mode.id].x = mode.ox + dx/cam.k; pos[mode.id].y = mode.oy + dy/cam.k; clampToGroup(mode.id); draw(); }
+  else if (mode.type === "group"){
+    const gx = dx/cam.k, gy = dy/cam.k;
+    mode.g.x = mode.ox + gx; mode.g.y = mode.oy + gy;
+    for (const [id,x,y] of mode.from){ pos[id].x = x + gx; pos[id].y = y + gy; }
+    draw();
+  }
+  else if (mode.type === "pan"){ cam.x = mode.ox + dx; cam.y = mode.oy + dy; applyCam(); }
+});
+function end(e){
+  if (!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId);
+  if (mode && (mode.type === "node" || mode.type === "press") && !mode.moved && pts.size === 0){
+    const i = stepOf[mode.id];
+    if (i !== undefined && i !== active) setStep(i);
+  }
+  if (mode && mode.type === "node") nodeEls[mode.id].classList.remove("dragging");
+  if (pts.size === 0){ mode = null; canvas.classList.remove("panning"); }
+}
+canvas.addEventListener("click", e => {
+  const b = e.target.closest(".expand"); if (!b) return;
+  const el = b.closest(".node"), on = el.classList.toggle("expanded");
+  b.setAttribute("aria-pressed", on); b.title = on ? "Collapse card" : "Expand to show full lines"; b.setAttribute("aria-label", b.title);
+  if (on) el.style.zIndex = ++z;
+  growGroup(el.dataset.id); clampToGroup(el.dataset.id);
+  drawNow();
+});
+canvas.addEventListener("pointerup", end);
+canvas.addEventListener("pointercancel", end);
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - r.left, e.clientY - r.top, cam.k * Math.exp(-e.deltaY * .01));
+  else { cam.x -= e.deltaX; cam.y -= e.deltaY; applyCam(); }
+}, {passive:false});
+
+let rt = 0;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => D && fit(currentIds(), false), 150); });
+
+/* ---------- boot ---------- */
+function boot(){
+  if (EMBEDDED) { load(EMBEDDED); return; }
+  canvas.insertAdjacentHTML("beforeend", `<div class="empty"><div><p>No review loaded.</p><p>Run <code>reviewgraph</code> on a branch, then open the JSON it writes.</p></div></div>`);
+}
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(boot);
+</script>
