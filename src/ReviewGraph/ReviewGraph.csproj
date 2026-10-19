@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ReviewGraph</RootNamespace>
+    <AssemblyName>reviewgraph</AssemblyName>
+    <!-- Deterministic builds: same input, same binary. -->
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!--
+    Normal mode: Roslyn comes from NuGet.
+    Offline mode (dotnet build -p:RoslynDir=<sdk>/DotnetTools/dotnet-format): reuse the Roslyn
+    assemblies that ship inside the .NET SDK, for machines without nuget.org access.
+  -->
+  <ItemGroup Condition="'$(RoslynDir)' == ''">
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RoslynDir)' != ''">
+    <Reference Include="$(RoslynDir)/Microsoft.Build.Locator.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.CSharp.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.Workspaces.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.CSharp.Workspaces.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.Workspaces.MSBuild.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll" />
+    <Reference Include="$(RoslynDir)/System.Composition.*.dll" />
+    <Reference Include="$(RoslynDir)/Microsoft.Bcl.AsyncInterfaces.dll" />
+    <Reference Include="$(RoslynDir)/Humanizer.dll" />
+    <Reference Include="$(RoslynDir)/System.IO.Pipelines.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="viewer.html" LogicalName="viewer.html" />
+  </ItemGroup>
+
+</Project>

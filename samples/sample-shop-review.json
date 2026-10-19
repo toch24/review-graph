@@ -1,0 +1,1389 @@
+{
+  "pr": {
+    "repo": "sample-shop",
+    "title": "Add coupon codes to checkout",
+    "branch": "feature/coupons",
+    "base": "main @ 0a69474c",
+    "head": "6e7311ae",
+    "analysis": "msbuild"
+  },
+  "stats": {
+    "adds": 86,
+    "dels": 4,
+    "filesChanged": 8,
+    "changedNodes": 20,
+    "contextNodes": 5
+  },
+  "overview": [
+    "20 changed units across 8 files, told in 6 steps.",
+    "Entry points involved: \u0060HTTP GET /api/Cart/{userId}/total\u0060, \u0060HTTP POST /api/Checkout\u0060 and \u0060Program start\u0060.",
+    "Colored cards are code this PR changes. Gray cards are unchanged code, included because the change calls into it or is called from it."
+  ],
+  "nodes": [
+    {
+      "id": "cartcontroller-gettotal",
+      "kind": "context",
+      "sym": "CartController.GetTotal()",
+      "member": "method",
+      "path": "src/Shop.Api/Controllers/",
+      "file": "CartController.cs",
+      "line": 20,
+      "entry": "HTTP GET /api/Cart/{userId}/total",
+      "test": false,
+      "adds": 0,
+      "dels": 0,
+      "layer": 2,
+      "order": 22,
+      "lines": [
+        {
+          "n": 20,
+          "t": " ",
+          "c": "[HttpGet(\u0022{userId}/total\u0022)]"
+        },
+        {
+          "n": 21,
+          "t": " ",
+          "c": "public async Task\u003CActionResult\u003Cdecimal\u003E\u003E GetTotal(string userId)"
+        },
+        {
+          "n": 22,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 23,
+          "t": " ",
+          "c": "    var cart = await _carts.GetAsync(userId);"
+        },
+        {
+          "n": 24,
+          "t": " ",
+          "c": "    return Ok(_pricing.CalculateTotal(cart));",
+          "id": "L24"
+        },
+        {
+          "n": 25,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "checkoutcontroller-checkout",
+      "kind": "context",
+      "sym": "CheckoutController.Checkout()",
+      "member": "method",
+      "path": "src/Shop.Api/Controllers/",
+      "file": "CheckoutController.cs",
+      "line": 15,
+      "entry": "HTTP POST /api/Checkout",
+      "test": false,
+      "adds": 0,
+      "dels": 0,
+      "layer": 0,
+      "order": 0,
+      "lines": [
+        {
+          "n": 15,
+          "t": " ",
+          "c": "[HttpPost]"
+        },
+        {
+          "n": 16,
+          "t": " ",
+          "c": "public async Task\u003CActionResult\u003COrder\u003E\u003E Checkout([FromBody] CheckoutRequest request)"
+        },
+        {
+          "n": 17,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 18,
+          "t": " ",
+          "c": "    var userId = User.Identity?.Name ?? \u0022anonymous\u0022;"
+        },
+        {
+          "n": 19,
+          "t": " ",
+          "c": "    var order = await _checkout.PlaceOrderAsync(userId, request);",
+          "id": "L19"
+        },
+        {
+          "n": 20,
+          "t": " ",
+          "c": "    return Ok(order);"
+        },
+        {
+          "n": 21,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "icouponrepository-findbycodeasync",
+      "kind": "new",
+      "sym": "ICouponRepository.FindByCodeAsync()",
+      "member": "interface method",
+      "path": "src/Shop.Api/Data/",
+      "file": "ICouponRepository.cs",
+      "line": 7,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 5,
+      "order": 8,
+      "lines": [
+        {
+          "n": 7,
+          "t": "\u002B",
+          "c": "Task\u003CCoupon?\u003E FindByCodeAsync(string code);",
+          "id": "L7"
+        }
+      ]
+    },
+    {
+      "id": "icouponrepository-incrementusesasync",
+      "kind": "new",
+      "sym": "ICouponRepository.IncrementUsesAsync()",
+      "member": "interface method",
+      "path": "src/Shop.Api/Data/",
+      "file": "ICouponRepository.cs",
+      "line": 8,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 5,
+      "order": 18,
+      "lines": [
+        {
+          "n": 8,
+          "t": "\u002B",
+          "c": "Task IncrementUsesAsync(Guid couponId);",
+          "id": "L8"
+        }
+      ]
+    },
+    {
+      "id": "inmemorycouponrepository-bycode",
+      "kind": "new",
+      "sym": "InMemoryCouponRepository._byCode",
+      "member": "field",
+      "path": "src/Shop.Api/Data/",
+      "file": "ICouponRepository.cs",
+      "line": 13,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 7,
+      "order": 10,
+      "lines": [
+        {
+          "n": 13,
+          "t": "\u002B",
+          "c": "private readonly Dictionary\u003Cstring, Coupon\u003E _byCode = new(StringComparer.OrdinalIgnoreCase);",
+          "id": "L13"
+        }
+      ]
+    },
+    {
+      "id": "inmemorycouponrepository-findbycodeasync",
+      "kind": "new",
+      "sym": "InMemoryCouponRepository.FindByCodeAsync()",
+      "member": "method",
+      "path": "src/Shop.Api/Data/",
+      "file": "ICouponRepository.cs",
+      "line": 15,
+      "test": false,
+      "adds": 2,
+      "dels": 0,
+      "layer": 6,
+      "order": 9,
+      "lines": [
+        {
+          "n": 15,
+          "t": "\u002B",
+          "c": "public Task\u003CCoupon?\u003E FindByCodeAsync(string code) =\u003E",
+          "id": "L15"
+        },
+        {
+          "n": 16,
+          "t": "\u002B",
+          "c": "    Task.FromResult(_byCode.TryGetValue(code, out var c) ? c : null);",
+          "id": "L16"
+        }
+      ]
+    },
+    {
+      "id": "inmemorycouponrepository-incrementusesasync",
+      "kind": "new",
+      "sym": "InMemoryCouponRepository.IncrementUsesAsync()",
+      "member": "method",
+      "path": "src/Shop.Api/Data/",
+      "file": "ICouponRepository.cs",
+      "line": 18,
+      "test": false,
+      "adds": 7,
+      "dels": 0,
+      "layer": 6,
+      "order": 19,
+      "lines": [
+        {
+          "n": 18,
+          "t": "\u002B",
+          "c": "public Task IncrementUsesAsync(Guid couponId)"
+        },
+        {
+          "n": 19,
+          "t": "\u002B",
+          "c": "{"
+        },
+        {
+          "n": 20,
+          "t": "\u002B",
+          "c": "    var match = _byCode.Values.FirstOrDefault(c =\u003E c.Id == couponId);",
+          "id": "L20"
+        },
+        {
+          "n": 21,
+          "t": "\u002B",
+          "c": "    if (match is not null)"
+        },
+        {
+          "n": 22,
+          "t": "\u002B",
+          "c": "        _byCode[match.Code] = match with { Uses = match.Uses \u002B 1 };"
+        },
+        {
+          "n": 23,
+          "t": "\u002B",
+          "c": "    return Task.CompletedTask;"
+        },
+        {
+          "n": 24,
+          "t": "\u002B",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "checkoutrequest-couponcode",
+      "kind": "new",
+      "sym": "CheckoutRequest.CouponCode",
+      "member": "property",
+      "path": "src/Shop.Api/Models/",
+      "file": "CheckoutRequest.cs",
+      "line": 6,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 4,
+      "lines": [
+        {
+          "n": 6,
+          "t": "\u002B",
+          "c": "public string? CouponCode { get; set; }"
+        }
+      ]
+    },
+    {
+      "id": "coupon",
+      "kind": "new",
+      "sym": "Coupon",
+      "member": "record",
+      "path": "src/Shop.Api/Models/",
+      "file": "Coupon.cs",
+      "line": 3,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 3,
+      "lines": [
+        {
+          "n": 3,
+          "t": "\u002B",
+          "c": "public record Coupon(Guid Id, string Code, int PercentOff, DateTimeOffset ExpiresAt, int Uses, int MaxUses);"
+        }
+      ]
+    },
+    {
+      "id": "order-couponid",
+      "kind": "new",
+      "sym": "Order.CouponId",
+      "member": "property",
+      "path": "src/Shop.Api/Models/",
+      "file": "Order.cs",
+      "line": 8,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 15,
+      "lines": [
+        {
+          "n": 8,
+          "t": "\u002B",
+          "c": "public Guid? CouponId { get; init; }"
+        }
+      ]
+    },
+    {
+      "id": "pricingcalculator-calculatetotal",
+      "kind": "changed",
+      "sym": "PricingCalculator.CalculateTotal()",
+      "member": "method",
+      "path": "src/Shop.Api/Pricing/",
+      "file": "PricingCalculator.cs",
+      "line": 10,
+      "test": false,
+      "adds": 4,
+      "dels": 2,
+      "layer": 3,
+      "order": 13,
+      "lines": [
+        {
+          "n": 10,
+          "t": "-",
+          "c": "public decimal CalculateTotal(Cart cart)"
+        },
+        {
+          "n": 10,
+          "t": "\u002B",
+          "c": "public decimal CalculateTotal(Cart cart, Coupon? coupon = null)",
+          "id": "L10"
+        },
+        {
+          "n": 11,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 12,
+          "t": " ",
+          "c": "    var subtotal = cart.Items.Sum(i =\u003E i.Price * i.Quantity);"
+        },
+        {
+          "n": 13,
+          "t": "-",
+          "c": "    return subtotal \u002B Shipping(subtotal);"
+        },
+        {
+          "n": 13,
+          "t": "\u002B",
+          "c": "    var discount = coupon is null ? 0m : Math.Round(subtotal * coupon.PercentOff / 100m, 2);"
+        },
+        {
+          "n": 14,
+          "t": "\u002B",
+          "c": "    var discounted = Math.Max(0m, subtotal - discount);"
+        },
+        {
+          "n": 15,
+          "t": "\u002B",
+          "c": "    return discounted \u002B Shipping(discounted);",
+          "id": "L15"
+        },
+        {
+          "n": 16,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "pricingcalculator-shipping",
+      "kind": "context",
+      "sym": "PricingCalculator.Shipping()",
+      "member": "method",
+      "path": "src/Shop.Api/Pricing/",
+      "file": "PricingCalculator.cs",
+      "line": 18,
+      "test": false,
+      "adds": 0,
+      "dels": 0,
+      "layer": 4,
+      "order": 14,
+      "lines": [
+        {
+          "n": 18,
+          "t": " ",
+          "c": "public decimal Shipping(decimal subtotal) =\u003E"
+        },
+        {
+          "n": 19,
+          "t": " ",
+          "c": "    subtotal \u003E= FreeShippingThreshold ? 0m : FlatShipping;"
+        }
+      ]
+    },
+    {
+      "id": "program-cs-top-level",
+      "kind": "changed",
+      "sym": "Program.cs (top-level)",
+      "member": "startup code",
+      "path": "src/Shop.Api/",
+      "file": "Program.cs",
+      "line": 5,
+      "entry": "Program start",
+      "test": false,
+      "adds": 3,
+      "dels": 0,
+      "layer": 0,
+      "order": 20,
+      "lines": [
+        {
+          "n": 5,
+          "t": " ",
+          "c": "var builder = WebApplication.CreateBuilder(args);"
+        },
+        {
+          "n": 6,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 7,
+          "t": " ",
+          "c": "builder.Services.AddControllers();"
+        },
+        {
+          "n": 8,
+          "t": " ",
+          "c": "builder.Services.AddSingleton\u003CICartRepository, InMemoryCartRepository\u003E();"
+        },
+        {
+          "n": 9,
+          "t": " ",
+          "c": "builder.Services.AddSingleton\u003CIOrderRepository, InMemoryOrderRepository\u003E();"
+        },
+        {
+          "n": 10,
+          "t": " ",
+          "c": "builder.Services.AddSingleton\u003CPricingCalculator\u003E();"
+        },
+        {
+          "n": 11,
+          "t": "\u002B",
+          "c": "builder.Services.AddSingleton\u003CICouponRepository, InMemoryCouponRepository\u003E();",
+          "id": "L11"
+        },
+        {
+          "n": 12,
+          "t": "\u002B",
+          "c": "builder.Services.AddSingleton(TimeProvider.System);"
+        },
+        {
+          "n": 13,
+          "t": "\u002B",
+          "c": "builder.Services.AddScoped\u003CICouponService, CouponService\u003E();",
+          "id": "L13"
+        },
+        {
+          "n": 14,
+          "t": " ",
+          "c": "builder.Services.AddScoped\u003CICheckoutService, CheckoutService\u003E();"
+        },
+        {
+          "n": 15,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 16,
+          "t": "\u2026",
+          "c": "3 unchanged lines"
+        },
+        {
+          "n": 19,
+          "t": " ",
+          "c": "app.Run();"
+        }
+      ]
+    },
+    {
+      "id": "checkoutservice-coupons",
+      "kind": "new",
+      "sym": "CheckoutService._coupons",
+      "member": "field",
+      "path": "src/Shop.Api/Services/",
+      "file": "CheckoutService.cs",
+      "line": 12,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 5,
+      "lines": [
+        {
+          "n": 12,
+          "t": "\u002B",
+          "c": "private readonly ICouponService _coupons;"
+        }
+      ]
+    },
+    {
+      "id": "checkoutservice-constructor",
+      "kind": "changed",
+      "sym": "CheckoutService constructor",
+      "member": "constructor",
+      "path": "src/Shop.Api/Services/",
+      "file": "CheckoutService.cs",
+      "line": 14,
+      "test": false,
+      "adds": 2,
+      "dels": 1,
+      "layer": 2,
+      "order": 23,
+      "lines": [
+        {
+          "n": 13,
+          "t": "-",
+          "c": "public CheckoutService(ICartRepository carts, IOrderRepository orders, PricingCalculator pricing)"
+        },
+        {
+          "n": 14,
+          "t": "\u002B",
+          "c": "public CheckoutService(ICartRepository carts, IOrderRepository orders, PricingCalculator pricing, ICouponService coupons)"
+        },
+        {
+          "n": 15,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 16,
+          "t": " ",
+          "c": "    _carts = carts;"
+        },
+        {
+          "n": 17,
+          "t": " ",
+          "c": "    _orders = orders;"
+        },
+        {
+          "n": 18,
+          "t": " ",
+          "c": "    _pricing = pricing;"
+        },
+        {
+          "n": 19,
+          "t": "\u002B",
+          "c": "    _coupons = coupons;",
+          "id": "L19"
+        },
+        {
+          "n": 20,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "checkoutservice-placeorderasync",
+      "kind": "changed",
+      "sym": "CheckoutService.PlaceOrderAsync()",
+      "member": "method",
+      "path": "src/Shop.Api/Services/",
+      "file": "CheckoutService.cs",
+      "line": 22,
+      "test": false,
+      "adds": 7,
+      "dels": 1,
+      "layer": 2,
+      "order": 2,
+      "lines": [
+        {
+          "n": 22,
+          "t": " ",
+          "c": "public async Task\u003COrder\u003E PlaceOrderAsync(string userId, CheckoutRequest request)"
+        },
+        {
+          "n": 23,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 24,
+          "t": " ",
+          "c": "    var cart = await _carts.GetAsync(userId);"
+        },
+        {
+          "n": 25,
+          "t": " ",
+          "c": "    if (cart.Items.Count == 0)"
+        },
+        {
+          "n": 26,
+          "t": " ",
+          "c": "        throw new InvalidOperationException(\u0022Cart is empty\u0022);"
+        },
+        {
+          "n": 27,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 26,
+          "t": "-",
+          "c": "    var total = _pricing.CalculateTotal(cart);"
+        },
+        {
+          "n": 28,
+          "t": "\u002B",
+          "c": "    Coupon? coupon = null;",
+          "id": "L28"
+        },
+        {
+          "n": 29,
+          "t": "\u002B",
+          "c": "    if (!string.IsNullOrWhiteSpace(request.CouponCode))",
+          "id": "L29"
+        },
+        {
+          "n": 30,
+          "t": "\u002B",
+          "c": "        coupon = await _coupons.ValidateAsync(request.CouponCode);",
+          "id": "L30"
+        },
+        {
+          "n": 31,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 32,
+          "t": "\u002B",
+          "c": "    var total = _pricing.CalculateTotal(cart, coupon);",
+          "id": "L32"
+        },
+        {
+          "n": 33,
+          "t": " ",
+          "c": "    var order = await _orders.CreateAsync(new Order"
+        },
+        {
+          "n": 34,
+          "t": " ",
+          "c": "    {"
+        },
+        {
+          "n": 35,
+          "t": " ",
+          "c": "        UserId = userId,"
+        },
+        {
+          "n": 36,
+          "t": " ",
+          "c": "        Total = total,"
+        },
+        {
+          "n": 37,
+          "t": "\u002B",
+          "c": "        CouponId = coupon?.Id,",
+          "id": "L37"
+        },
+        {
+          "n": 38,
+          "t": " ",
+          "c": "        PlacedAt = DateTimeOffset.UtcNow,"
+        },
+        {
+          "n": 39,
+          "t": " ",
+          "c": "    });"
+        },
+        {
+          "n": 40,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 41,
+          "t": "\u002B",
+          "c": "    if (coupon is not null)"
+        },
+        {
+          "n": 42,
+          "t": "\u002B",
+          "c": "        _coupons.RecordUseAsync(coupon.Id);",
+          "id": "L42"
+        },
+        {
+          "n": 43,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 44,
+          "t": " ",
+          "c": "    await _carts.ClearAsync(userId);"
+        },
+        {
+          "n": 45,
+          "t": " ",
+          "c": "    return order;"
+        },
+        {
+          "n": 46,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "icouponservice-validateasync",
+      "kind": "new",
+      "sym": "ICouponService.ValidateAsync()",
+      "member": "interface method",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 8,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 6,
+      "lines": [
+        {
+          "n": 8,
+          "t": "\u002B",
+          "c": "Task\u003CCoupon\u003E ValidateAsync(string code);",
+          "id": "L8"
+        }
+      ]
+    },
+    {
+      "id": "icouponservice-recorduseasync",
+      "kind": "new",
+      "sym": "ICouponService.RecordUseAsync()",
+      "member": "interface method",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 9,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 3,
+      "order": 16,
+      "lines": [
+        {
+          "n": 9,
+          "t": "\u002B",
+          "c": "Task RecordUseAsync(Guid couponId);",
+          "id": "L9"
+        }
+      ]
+    },
+    {
+      "id": "couponservice-coupons",
+      "kind": "new",
+      "sym": "CouponService._coupons",
+      "member": "field",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 14,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 5,
+      "order": 11,
+      "lines": [
+        {
+          "n": 14,
+          "t": "\u002B",
+          "c": "private readonly ICouponRepository _coupons;"
+        }
+      ]
+    },
+    {
+      "id": "couponservice-clock",
+      "kind": "new",
+      "sym": "CouponService._clock",
+      "member": "field",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 15,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 5,
+      "order": 12,
+      "lines": [
+        {
+          "n": 15,
+          "t": "\u002B",
+          "c": "private readonly TimeProvider _clock;"
+        }
+      ]
+    },
+    {
+      "id": "couponservice-constructor",
+      "kind": "new",
+      "sym": "CouponService constructor",
+      "member": "constructor",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 17,
+      "test": false,
+      "adds": 5,
+      "dels": 0,
+      "layer": 1,
+      "order": 21,
+      "lines": [
+        {
+          "n": 17,
+          "t": "\u002B",
+          "c": "public CouponService(ICouponRepository coupons, TimeProvider clock)"
+        },
+        {
+          "n": 18,
+          "t": "\u002B",
+          "c": "{"
+        },
+        {
+          "n": 19,
+          "t": "\u002B",
+          "c": "    _coupons = coupons;",
+          "id": "L19"
+        },
+        {
+          "n": 20,
+          "t": "\u002B",
+          "c": "    _clock = clock;",
+          "id": "L20"
+        },
+        {
+          "n": 21,
+          "t": "\u002B",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "couponservice-validateasync",
+      "kind": "new",
+      "sym": "CouponService.ValidateAsync()",
+      "member": "method",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 23,
+      "test": false,
+      "adds": 10,
+      "dels": 0,
+      "layer": 4,
+      "order": 7,
+      "lines": [
+        {
+          "n": 23,
+          "t": "\u002B",
+          "c": "public async Task\u003CCoupon\u003E ValidateAsync(string code)",
+          "id": "L23"
+        },
+        {
+          "n": 24,
+          "t": "\u002B",
+          "c": "{"
+        },
+        {
+          "n": 25,
+          "t": "\u002B",
+          "c": "    var coupon = await _coupons.FindByCodeAsync(code.Trim())",
+          "id": "L25"
+        },
+        {
+          "n": 26,
+          "t": "\u002B",
+          "c": "        ?? throw new KeyNotFoundException($\u0022Coupon \u0027{code}\u0027 not found\u0022);"
+        },
+        {
+          "n": 27,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 28,
+          "t": "\u002B",
+          "c": "    if (coupon.ExpiresAt \u003C _clock.GetUtcNow())",
+          "id": "L28"
+        },
+        {
+          "n": 29,
+          "t": "\u002B",
+          "c": "        throw new InvalidOperationException(\u0022Coupon has expired\u0022);"
+        },
+        {
+          "n": 30,
+          "t": "\u002B",
+          "c": "    if (coupon.Uses \u003E= coupon.MaxUses)"
+        },
+        {
+          "n": 31,
+          "t": "\u002B",
+          "c": "        throw new InvalidOperationException(\u0022Coupon has been used up\u0022);"
+        },
+        {
+          "n": 32,
+          "t": " ",
+          "c": ""
+        },
+        {
+          "n": 33,
+          "t": "\u002B",
+          "c": "    return coupon;"
+        },
+        {
+          "n": 34,
+          "t": "\u002B",
+          "c": "}"
+        }
+      ]
+    },
+    {
+      "id": "couponservice-recorduseasync",
+      "kind": "new",
+      "sym": "CouponService.RecordUseAsync()",
+      "member": "method",
+      "path": "src/Shop.Api/Services/",
+      "file": "CouponService.cs",
+      "line": 36,
+      "test": false,
+      "adds": 1,
+      "dels": 0,
+      "layer": 4,
+      "order": 17,
+      "lines": [
+        {
+          "n": 36,
+          "t": "\u002B",
+          "c": "public Task RecordUseAsync(Guid couponId) =\u003E _coupons.IncrementUsesAsync(couponId);",
+          "id": "L36"
+        }
+      ]
+    },
+    {
+      "id": "icheckoutservice-placeorderasync",
+      "kind": "context",
+      "sym": "ICheckoutService.PlaceOrderAsync()",
+      "member": "interface method",
+      "path": "src/Shop.Api/Services/",
+      "file": "ICheckoutService.cs",
+      "line": 7,
+      "test": false,
+      "adds": 0,
+      "dels": 0,
+      "layer": 1,
+      "order": 1,
+      "lines": [
+        {
+          "n": 7,
+          "t": " ",
+          "c": "Task\u003COrder\u003E PlaceOrderAsync(string userId, CheckoutRequest request);",
+          "id": "L7"
+        }
+      ]
+    },
+    {
+      "id": "pricingcalculatortests-addsflatshippingunderthreshold",
+      "kind": "context",
+      "sym": "PricingCalculatorTests.AddsFlatShippingUnderThreshold()",
+      "member": "method",
+      "path": "tests/Shop.Tests/",
+      "file": "PricingCalculatorTests.cs",
+      "line": 9,
+      "entry": "Test",
+      "test": true,
+      "adds": 0,
+      "dels": 0,
+      "layer": 2,
+      "order": 24,
+      "lines": [
+        {
+          "n": 9,
+          "t": " ",
+          "c": "[Fact]"
+        },
+        {
+          "n": 10,
+          "t": " ",
+          "c": "public void AddsFlatShippingUnderThreshold()"
+        },
+        {
+          "n": 11,
+          "t": " ",
+          "c": "{"
+        },
+        {
+          "n": 12,
+          "t": "\u2026",
+          "c": "3 unchanged lines"
+        },
+        {
+          "n": 15,
+          "t": " ",
+          "c": "    var total = new PricingCalculator().CalculateTotal(cart);",
+          "id": "L15"
+        },
+        {
+          "n": 16,
+          "t": "\u2026",
+          "c": "2 unchanged lines"
+        },
+        {
+          "n": 18,
+          "t": " ",
+          "c": "}"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "checkoutcontroller-checkout:L19",
+      "to": "icheckoutservice-placeorderasync",
+      "label": "calls"
+    },
+    {
+      "from": "icheckoutservice-placeorderasync:L7",
+      "to": "checkoutservice-placeorderasync",
+      "label": "implemented by"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L28",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L29",
+      "to": "checkoutrequest-couponcode",
+      "label": "reads"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L30",
+      "to": "checkoutservice-coupons",
+      "label": "reads"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L30",
+      "to": "icouponservice-validateasync",
+      "label": "calls"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L32",
+      "to": "pricingcalculator-calculatetotal",
+      "label": "calls"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L37",
+      "to": "order-couponid",
+      "label": "sets"
+    },
+    {
+      "from": "checkoutservice-placeorderasync:L42",
+      "to": "icouponservice-recorduseasync",
+      "label": "calls"
+    },
+    {
+      "from": "icouponservice-validateasync:L8",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "icouponservice-validateasync:L8",
+      "to": "couponservice-validateasync",
+      "label": "implemented by"
+    },
+    {
+      "from": "couponservice-validateasync:L23",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "couponservice-validateasync:L25",
+      "to": "icouponrepository-findbycodeasync",
+      "label": "calls"
+    },
+    {
+      "from": "couponservice-validateasync:L25",
+      "to": "couponservice-coupons",
+      "label": "reads"
+    },
+    {
+      "from": "couponservice-validateasync:L28",
+      "to": "couponservice-clock",
+      "label": "reads"
+    },
+    {
+      "from": "icouponrepository-findbycodeasync:L7",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "icouponrepository-findbycodeasync:L7",
+      "to": "inmemorycouponrepository-findbycodeasync",
+      "label": "implemented by"
+    },
+    {
+      "from": "inmemorycouponrepository-findbycodeasync:L15",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "inmemorycouponrepository-findbycodeasync:L16",
+      "to": "inmemorycouponrepository-bycode",
+      "label": "reads"
+    },
+    {
+      "from": "inmemorycouponrepository-bycode:L13",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "pricingcalculator-calculatetotal:L10",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "pricingcalculator-calculatetotal:L15",
+      "to": "pricingcalculator-shipping",
+      "label": "calls"
+    },
+    {
+      "from": "icouponservice-recorduseasync:L9",
+      "to": "couponservice-recorduseasync",
+      "label": "implemented by"
+    },
+    {
+      "from": "couponservice-recorduseasync:L36",
+      "to": "couponservice-coupons",
+      "label": "reads"
+    },
+    {
+      "from": "couponservice-recorduseasync:L36",
+      "to": "icouponrepository-incrementusesasync",
+      "label": "calls"
+    },
+    {
+      "from": "icouponrepository-incrementusesasync:L8",
+      "to": "inmemorycouponrepository-incrementusesasync",
+      "label": "implemented by"
+    },
+    {
+      "from": "inmemorycouponrepository-incrementusesasync:L20",
+      "to": "coupon",
+      "label": "uses"
+    },
+    {
+      "from": "inmemorycouponrepository-incrementusesasync:L20",
+      "to": "inmemorycouponrepository-bycode",
+      "label": "reads"
+    },
+    {
+      "from": "program-cs-top-level:L11",
+      "to": "inmemorycouponrepository-findbycodeasync",
+      "label": "registers"
+    },
+    {
+      "from": "program-cs-top-level:L13",
+      "to": "couponservice-constructor",
+      "label": "registers"
+    },
+    {
+      "from": "couponservice-constructor:L19",
+      "to": "couponservice-coupons",
+      "label": "sets"
+    },
+    {
+      "from": "couponservice-constructor:L20",
+      "to": "couponservice-clock",
+      "label": "sets"
+    },
+    {
+      "from": "cartcontroller-gettotal:L24",
+      "to": "pricingcalculator-calculatetotal",
+      "label": "calls"
+    },
+    {
+      "from": "checkoutservice-constructor:L19",
+      "to": "checkoutservice-coupons",
+      "label": "sets"
+    },
+    {
+      "from": "pricingcalculatortests-addsflatshippingunderthreshold:L15",
+      "to": "pricingcalculator-calculatetotal",
+      "label": "calls"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Changed: CheckoutService.PlaceOrderAsync()",
+      "primary": "checkoutservice-placeorderasync",
+      "nodes": [
+        "checkoutservice-placeorderasync",
+        "coupon",
+        "checkoutrequest-couponcode",
+        "checkoutservice-coupons",
+        "order-couponid",
+        "checkoutservice-constructor",
+        "icheckoutservice-placeorderasync",
+        "icouponservice-validateasync",
+        "pricingcalculator-calculatetotal",
+        "icouponservice-recorduseasync",
+        "checkoutcontroller-checkout"
+      ],
+      "body": [
+        "Changed method in \u0060CheckoutService.cs\u0060 (\u002B7 \u22121).",
+        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 here.",
+        "Calls \u0060ICouponService.ValidateAsync()\u0060, \u0060PricingCalculator.CalculateTotal()\u0060 and \u0060ICouponService.RecordUseAsync()\u0060.",
+        "Also in this step: \u0060Coupon\u0060 (new record), \u0060CheckoutRequest.CouponCode\u0060 (new property), \u0060CheckoutService._coupons\u0060 (new field), \u0060Order.CouponId\u0060 (new property), \u0060CheckoutService constructor\u0060 (changed constructor)."
+      ],
+      "checks": [
+        {
+          "ok": false,
+          "text": "Compiler warning CS4014 on line 42: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the \u0027await\u0027 operator to the result of the call."
+        },
+        {
+          "ok": false,
+          "text": "No test reaches this within 3 calls."
+        },
+        {
+          "ok": true,
+          "text": "\u0060CheckoutService constructor\u0060: All 4 injected services are registered for dependency injection."
+        }
+      ]
+    },
+    {
+      "title": "New: CouponService.ValidateAsync()",
+      "primary": "couponservice-validateasync",
+      "nodes": [
+        "couponservice-validateasync",
+        "icouponservice-validateasync",
+        "couponservice-coupons",
+        "couponservice-clock",
+        "couponservice-constructor",
+        "coupon",
+        "icouponrepository-findbycodeasync"
+      ],
+      "body": [
+        "New method in \u0060CouponService.cs\u0060 (\u002B10).",
+        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060CheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060ICouponService.ValidateAsync()\u0060 \u2192 here.",
+        "Calls \u0060ICouponRepository.FindByCodeAsync()\u0060.",
+        "Uses \u0060Coupon\u0060.",
+        "Also in this step: \u0060ICouponService.ValidateAsync()\u0060 (new interface method), \u0060CouponService._coupons\u0060 (new field), \u0060CouponService._clock\u0060 (new field), \u0060CouponService constructor\u0060 (new constructor)."
+      ],
+      "checks": [
+        {
+          "ok": false,
+          "text": "Can now throw \u0060InvalidOperationException\u0060, \u0060KeyNotFoundException\u0060. \u0060CheckoutService.PlaceOrderAsync()\u0060 doesn\u0027t catch them, so check where they surface."
+        },
+        {
+          "ok": false,
+          "text": "No test reaches this within 3 calls."
+        },
+        {
+          "ok": true,
+          "text": "\u0060CouponService constructor\u0060: Both injected services are registered for dependency injection."
+        }
+      ]
+    },
+    {
+      "title": "Changed: PricingCalculator.CalculateTotal()",
+      "primary": "pricingcalculator-calculatetotal",
+      "nodes": [
+        "pricingcalculator-calculatetotal",
+        "checkoutservice-placeorderasync",
+        "coupon",
+        "pricingcalculator-shipping",
+        "cartcontroller-gettotal",
+        "pricingcalculatortests-addsflatshippingunderthreshold"
+      ],
+      "body": [
+        "Changed method in \u0060PricingCalculator.cs\u0060 (\u002B4 \u22122). The signature changed.",
+        "Reached from \u0060HTTP GET /api/Cart/{userId}/total\u0060: \u0060CartController.GetTotal()\u0060 \u2192 here.",
+        "Called from \u0060CheckoutService.PlaceOrderAsync()\u0060 and \u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060.",
+        "Calls \u0060PricingCalculator.Shipping()\u0060.",
+        "Uses \u0060Coupon\u0060."
+      ],
+      "checks": [
+        {
+          "ok": false,
+          "text": "Signature changed. 2 call sites still use it unchanged: \u0060CartController.GetTotal()\u0060 (CartController.cs:24), \u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060 (PricingCalculatorTests.cs:15). Check they still behave as intended."
+        },
+        {
+          "ok": false,
+          "text": "Existing tests reach this (\u0060PricingCalculatorTests.AddsFlatShippingUnderThreshold()\u0060), but none were added or changed for the new behavior."
+        }
+      ]
+    },
+    {
+      "title": "New: CouponService.RecordUseAsync()",
+      "primary": "couponservice-recorduseasync",
+      "nodes": [
+        "couponservice-recorduseasync",
+        "icouponservice-recorduseasync",
+        "couponservice-coupons",
+        "icouponrepository-incrementusesasync"
+      ],
+      "body": [
+        "New method in \u0060CouponService.cs\u0060 (\u002B1).",
+        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u0060ICheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060CheckoutService.PlaceOrderAsync()\u0060 \u2192 \u0060ICouponService.RecordUseAsync()\u0060 \u2192 here.",
+        "Calls \u0060ICouponRepository.IncrementUsesAsync()\u0060.",
+        "Also in this step: \u0060ICouponService.RecordUseAsync()\u0060 (new interface method)."
+      ],
+      "checks": [
+        {
+          "ok": false,
+          "text": "No test reaches this within 3 calls."
+        }
+      ]
+    },
+    {
+      "title": "New: InMemoryCouponRepository.IncrementUsesAsync()",
+      "primary": "inmemorycouponrepository-incrementusesasync",
+      "nodes": [
+        "inmemorycouponrepository-incrementusesasync",
+        "icouponrepository-findbycodeasync",
+        "inmemorycouponrepository-findbycodeasync",
+        "inmemorycouponrepository-bycode",
+        "icouponrepository-incrementusesasync",
+        "coupon"
+      ],
+      "body": [
+        "New method in \u0060ICouponRepository.cs\u0060 (\u002B7).",
+        "Reached from \u0060HTTP POST /api/Checkout\u0060: \u0060CheckoutController.Checkout()\u0060 \u2192 \u2026 \u2192 \u0060CouponService.RecordUseAsync()\u0060 \u2192 \u0060ICouponRepository.IncrementUsesAsync()\u0060 \u2192 here.",
+        "Called from \u0060CouponService.ValidateAsync()\u0060.",
+        "Uses \u0060Coupon\u0060.",
+        "Also in this step: \u0060ICouponRepository.FindByCodeAsync()\u0060 (new interface method), \u0060InMemoryCouponRepository.FindByCodeAsync()\u0060 (new method), \u0060InMemoryCouponRepository._byCode\u0060 (new field), \u0060ICouponRepository.IncrementUsesAsync()\u0060 (new interface method)."
+      ],
+      "checks": [
+        {
+          "ok": false,
+          "text": "No test reaches this within 3 calls."
+        },
+        {
+          "ok": false,
+          "text": "\u0060InMemoryCouponRepository.FindByCodeAsync()\u0060: No test reaches this within 3 calls."
+        }
+      ]
+    },
+    {
+      "title": "Changed: Program.cs (top-level)",
+      "primary": "program-cs-top-level",
+      "nodes": [
+        "program-cs-top-level",
+        "inmemorycouponrepository-findbycodeasync",
+        "couponservice-constructor"
+      ],
+      "body": [
+        "Changed startup code in \u0060Program.cs\u0060 (\u002B3 \u22120).",
+        "This is where execution starts: \u0060Program start\u0060.",
+        "Registers \u0060InMemoryCouponRepository\u0060 and \u0060CouponService\u0060 for dependency injection."
+      ],
+      "checks": []
+    }
+  ],
+  "warnings": [],
+  "generator": "reviewgraph 0.1"
+}
