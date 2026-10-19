@@ -1,4 +1,4 @@
-# reviewgraph
+# review-graph
 
 Turns a C# pull request into a storyline graph a reviewer can read without knowing the codebase.
 Changed code becomes cards, unchanged code that explains it becomes gray context cards, and edges
