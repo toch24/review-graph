@@ -104,7 +104,11 @@ git tag v0.2.0 && git push origin v0.2.0
 ```
 
 The `release` workflow packs the tag as version `0.2.0` and pushes it to nuget.org
-(needs the `NUGET_API_KEY` secret). To pack by hand: `dotnet pack src/ReviewGraph -c Release`.
+using NuGet trusted publishing (see below). To pack by hand: `dotnet pack src/ReviewGraph -c Release`.
+
+One-time setup on nuget.org: **Trusted Publishing** → add a policy for this repository
+(`toch24/review-graph`) and the workflow file `release.yml`. Then add a `NUGET_USER` repository
+variable (Settings → Secrets and variables → Actions → Variables) with your nuget.org username.
 
 ## How it works
 

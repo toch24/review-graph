@@ -1,7 +1,9 @@
 name: release
 
 # Push a tag like v0.2.0 to publish that version to nuget.org.
-# Needs a NUGET_API_KEY repository secret.
+# Uses NuGet trusted publishing (OIDC), so there is no API key to store.
+# Needs a trusted publishing policy on nuget.org for this repo and workflow file,
+# and a NUGET_USER repository variable holding your nuget.org username (not your email).
 on:
   push:
     tags: ['v*']
@@ -9,11 +11,19 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: "8.0.x\n10.0.x" }
       - name: Pack
         run: dotnet pack src/ReviewGraph -c Release -p:Version=${GITHUB_REF_NAME#v} -o out
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
       - name: Push
-        run: dotnet nuget push out/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push out/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
