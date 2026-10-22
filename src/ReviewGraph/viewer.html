@@ -44,6 +44,12 @@ button{font:inherit;color:inherit}
 code{font-family:var(--mono);font-size:.88em;background:var(--panel-2);border:1px solid var(--border);padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
 
 .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
+.app{overflow:hidden}
+.app.slide{transition:grid-template-columns .3s cubic-bezier(.3,.7,.2,1),grid-template-rows .3s cubic-bezier(.3,.7,.2,1)}
+.app.collapsed{grid-template-columns:minmax(0,1fr) 0}
+.app .panel{width:400px;justify-self:start;transition:visibility 0s}
+.app.collapsed .panel{visibility:hidden}
+.app.slide.collapsed .panel{transition:visibility 0s .3s}
 
 /* ---------- canvas ---------- */
 .canvas{position:relative;overflow:hidden;touch-action:none;cursor:grab;
@@ -146,6 +152,12 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
   background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 10px}
 .zoom-read{position:absolute;left:58px;bottom:14px;font:500 11px/32px var(--mono);color:var(--faint);z-index:5;font-variant-numeric:tabular-nums}
 
+.panelbtn{position:absolute;top:14px;right:14px;width:34px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--panel);
+  color:var(--muted);cursor:pointer;display:grid;place-items:center;z-index:5}
+.panelbtn:hover{color:var(--fg);background:var(--panel-2)}
+.panelbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.app:not(.collapsed) .panelbtn .open,.app.collapsed .panelbtn .close{display:none}
+
 /* ---------- panel ---------- */
 .panel{border-left:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;min-height:0;min-width:0}
 .pr{padding:18px 20px 16px;border-bottom:1px solid var(--border)}
@@ -198,6 +210,9 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
 
 @media (max-width:820px){
   .app{grid-template-columns:minmax(0,1fr);grid-template-rows:55% 45%}
+  .app.collapsed{grid-template-columns:minmax(0,1fr);grid-template-rows:100% 0}
+  .app .panel{width:auto}
+  .panelbtn{top:auto;bottom:14px}
   .panel{border-left:0;border-top:1px solid var(--border)}
   .hint{display:none}
   .legend{gap:10px;padding:7px 10px}
@@ -227,6 +242,9 @@ svg.edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;p
       <button id="relayout" title="Reset layout" aria-label="Reset layout"><svg viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.5-3.5M3 2v3h3"/></svg></button>
       <button id="ctx" title="Hide context cards" aria-label="Show context cards" aria-pressed="true"><svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke-dasharray="2 2"/><path d="M5.5 8h5"/></svg></button>
     </div>
+    <button class="panelbtn" id="panelbtn" title="Hide story panel (S)" aria-label="Hide story panel" aria-expanded="true">
+      <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M10 3v10"/><path class="close" d="M5.5 6.5L7 8l-1.5 1.5"/><path class="open" d="M7 6.5L5.5 8 7 9.5"/></svg>
+    </button>
     <div class="zoom-read" id="zread">100%</div>
     <div class="hint">Drag cards by their header · scroll to pan · ⌘/Ctrl + scroll to zoom<br>← → to move through the story</div>
   </main>
@@ -458,10 +476,10 @@ function animate(fn){
   clearTimeout(animate.t); animate.t = setTimeout(() => canvas.classList.remove("anim"), 520);
 }
 function currentIds(){ return STEPS[active] ? STEPS[active].nodes : NODES.map(n=>n.id); }
-function fit(ids, anim = true){
+function fitCam(ids){
   ids = ids.filter(visible);
   if (!ids.length) ids = NODES.map(n=>n.id).filter(visible);
-  if (!ids.length) return;
+  if (!ids.length) return null;
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   ids.forEach(id => { const el = nodeEls[id];
     x0 = Math.min(x0,pos[id].x); y0 = Math.min(y0,pos[id].y);
@@ -475,7 +493,11 @@ function fit(ids, anim = true){
     k = min; const p = pos[st.primary], el = nodeEls[st.primary];
     cx = p.x + el.offsetWidth/2; cy = Math.max(p.y + el.offsetHeight/2, y0 + (r.height/2 - pad)/k);
   }
-  const go = () => { cam.k = k; cam.x = r.width/2 - cx*k; cam.y = r.height/2 - cy*k + 18; applyCam(); };
+  return { k, x: r.width/2 - cx*k, y: r.height/2 - cy*k + 18 };
+}
+function fit(ids, anim = true){
+  const c = fitCam(ids); if (!c) return;
+  const go = () => { cam.k = c.k; cam.x = c.x; cam.y = c.y; applyCam(); };
   anim ? animate(go) : go();
 }
 function zoomAt(cx, cy, k){
@@ -551,7 +573,28 @@ addEventListener("keydown", e => {
   else if (e.key === "ArrowLeft") setStep(Math.max(-1, active-1));
   else if (e.key === "Escape" && active >= 0) setStep(-1, true, false);
   else if (e.key === "f" || e.key === "F") fit(currentIds());
+  else if ((e.key === "s" || e.key === "S") && !e.metaKey && !e.ctrlKey && !e.altKey) togglePanel();
 });
+
+/* ---------- story panel toggle ---------- */
+function togglePanel(collapse = !$(".app").classList.contains("collapsed"), slide = true){
+  const app = $(".app");
+  // Only refit when the view was already the fitted one; a zoomed-in or panned view is left alone.
+  const f = D && fitCam(currentIds()), refit = togglePanel.pending || !!f && Math.abs(f.k-cam.k) < .01 && Math.abs(f.x-cam.x) < 2 && Math.abs(f.y-cam.y) < 2;
+  app.classList.toggle("slide", slide && !reduce);
+  app.classList.toggle("collapsed", collapse);
+  const b = $("#panelbtn");
+  b.title = (collapse ? "Show" : "Hide") + " story panel (S)";
+  b.setAttribute("aria-label", (collapse ? "Show" : "Hide") + " story panel");
+  b.setAttribute("aria-expanded", String(!collapse));
+  try { localStorage.setItem("reviewgraph.panel", collapse ? "0" : "1"); } catch {}
+  clearTimeout(togglePanel.t); togglePanel.pending = false;
+  if (refit) {
+    togglePanel.pending = true;
+    togglePanel.t = setTimeout(() => { togglePanel.pending = false; fit(currentIds(), slide && !reduce); }, slide && !reduce ? 300 : 0);
+  }
+}
+$("#panelbtn").onclick = () => togglePanel();
 
 /* ---------- controls ---------- */
 const center = () => { const r = canvas.getBoundingClientRect(); return [r.width/2, r.height/2]; };
@@ -576,7 +619,7 @@ $("#file").onchange = async e => {
 /* ---------- pointer: drag cards, pan, pinch ---------- */
 const pts = new Map(); let mode = null;
 canvas.addEventListener("pointerdown", e => {
-  if (e.target.closest(".controls,.legend,.expand")) return;
+  if (e.target.closest(".controls,.legend,.expand,.panelbtn")) return;
   pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if (pts.size === 2){
     const [a,b] = [...pts.values()];
@@ -658,6 +701,7 @@ addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => D && 
 
 /* ---------- boot ---------- */
 function boot(){
+  try { if (localStorage.getItem("reviewgraph.panel") === "0") togglePanel(true, false); } catch {}
   if (EMBEDDED) { load(EMBEDDED); return; }
   canvas.insertAdjacentHTML("beforeend", `<div class="empty"><div><p>No review loaded.</p><p>Run <code>reviewgraph</code> on a branch, then open the JSON it writes.</p></div></div>`);
 }

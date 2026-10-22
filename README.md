@@ -1,13 +1,51 @@
 # review-graph
 
-Turns a C# pull request into a storyline graph a reviewer can read without knowing the codebase.
-Changed code becomes cards, unchanged code that explains it becomes gray context cards, and edges
-start at the exact line that makes the call. A side panel walks through the change step by step,
-from the entry point (HTTP route, `Main`, message handler, background service, test) down to the
-data it touches, with rule-based checks for each step.
+Reviewing a pull request is not linear. A PR is not a list of files to read from A to Z. It is a story:
+a request comes in, it moves through the code, and it ends up in the data. Reading files in
+alphabetical order hides that story.
 
-The output is deterministic: the same repo, base and head always produce byte-identical
-`review.html` and `review.json`.
+review-graph draws the story as a graph for C# pull requests.
+
+- Every changed method, property or field is a **card**.
+- Every call from one card to another is an **arrow**. The arrow starts at the exact line that makes the call.
+- The graph reads left to right, from the **entry point** (an HTTP route, `Main`, a message handler,
+  a background service, a test) down to the data it touches.
+- A side panel walks you through the story **step by step**, the way you would step through it in a
+  debugger. Each step has simple checks (for example: "this method is new and nothing calls it").
+
+You can review the PR without knowing the codebase.
+
+The result is always the same: the same repo, base and head give the exact same `review.html` and
+`review.json`.
+
+## What shows in the graph
+
+- **Changed code.** Every method, constructor, property, field and type the PR touched. A card is
+  **new** if every line in it was added. Otherwise it is **changed**.
+- **Calls that come from changed lines.** Always shown.
+- **Calls from unchanged lines, only if they lead to other changed code.** This keeps the graph about the change.
+- **Gray context cards.** Unchanged code that helps explain the change:
+  - up to 3 callers of each changed method (entry points first, then 1 test)
+  - callers walked up to 3 more steps, until an entry point is found
+  - the interface that a changed class implements
+- **DI registrations.** `AddScoped<IFoo, Foo>()` becomes an arrow to `Foo`.
+- **Other files.** Non-C# files that changed show up as plain diff cards.
+- **Checks.** Compiler warnings on added lines, changed signatures, missing DI registrations, new
+  `throw`s, other implementations the PR did not update, new unused methods, and whether a test
+  reaches the code.
+
+## What does not show
+
+- **Unchanged code that is not related to the change.** The graph is not a map of your whole project.
+- **Calls hidden from static analysis:** reflection, `dynamic`, string-based dispatch and
+  source-generated code.
+- **`using` changes.** Added or removed `using` lines get no card, because they don't change what the code does.
+- **More than 3 unchanged callers** for one method.
+- **Calls into NuGet packages in `--source-only` mode.** Calls between your own types still work.
+- **The reason behind the change.** The story text describes the structure. It does not explain why
+  the author did it.
+
+Very large PRs make large graphs. Use the step view and the context toggle to cut them down.
 
 ## Run it
 
@@ -18,18 +56,18 @@ dotnet run --project src/ReviewGraph -c Release -- path/to/repo --base main --ou
 
 | Option | Meaning |
 |---|---|
-| `repo` | Repository to analyse. The working tree is analysed, so check out the PR branch first. |
-| `--base <ref>` | Branch the PR merges into. Defaults to `main`, then `master`. The diff starts at the merge base. |
-| `--head <ref>` | Commit to compare. Defaults to the working tree, uncommitted edits included. Must be checked out. |
-| `--solution <path>` | `.sln` or `.csproj` to load. Defaults to the first `.sln` in the repo root, else every `.csproj`. |
-| `--out` / `--json` | Self-contained viewer page / raw graph JSON. |
-| `--title <text>` | PR title. Defaults to the latest commit subject. |
-| `--source-only` | Skip MSBuild and compile the `.cs` files directly against the installed .NET and ASP.NET Core reference assemblies. No restore needed. Calls between your own types still resolve; types from NuGet packages don't. |
+| `repo` | Repository to analyse. It reads the working tree, so check out the PR branch first. |
+| `--base <ref>` | Branch the PR merges into. Default: `main`, then `master`. The diff starts at the merge base. |
+| `--head <ref>` | Commit to compare. Default: the working tree, including uncommitted edits. Must be checked out. |
+| `--solution <path>` | `.sln` or `.csproj` to load. Default: the first `.sln` in the repo root, else every `.csproj`. |
+| `--out` / `--json` | Viewer page (one file) / raw graph JSON. |
+| `--title <text>` | PR title. Default: the latest commit subject. |
+| `--source-only` | Skip MSBuild and compile the `.cs` files directly against the installed .NET and ASP.NET Core libraries. No restore needed. Calls between your own types still work. Types from NuGet packages do not. |
 
-The viewer page has no server and no build step. Open it in a browser, or load any `review.json`
+The viewer page needs no server and no build step. Open it in a browser, or load any `review.json`
 into it with **Open JSON**.
 
-**No access to nuget.org?** Build against the Roslyn copy that ships inside the .NET SDK:
+**No access to nuget.org?** Build with the Roslyn copy that ships inside the .NET SDK:
 `dotnet build -c Release -p:RoslynDir=$(dirname $(which dotnet))/sdk/<version>/DotnetTools/dotnet-format`
 
 ### In CI (GitHub Actions)
@@ -47,59 +85,56 @@ into it with **Open JSON**.
 
 ## How it works
 
-Everything runs on Roslyn's semantic model, which is the compiler's own understanding of the code, so
-calls resolve through overloads, extension methods, generics and `var` the way the compiler sees them.
+It uses Roslyn, the C# compiler. So it sees calls the same way the compiler does, even through
+overloads, extension methods, generics and `var`.
 
-1. **Diff → units.** `git diff --unified=0` against the merge base gives exact added and removed
-   lines. Each one is mapped to the innermost *unit* around it: a method, constructor, property,
-   field, a type (only for changes outside its members), or a file's top-level statements. A unit is
-   **new** when every non-blank line in it was added, otherwise **changed**. Removed lines go to the
-   unit that surrounds the gap they left. Non-C# files become plain diff cards.
-2. **Outgoing edges.** Inside each changed unit, invocations, `new` expressions and references to
-   other changed data are resolved to symbols. Edges from *changed* lines are always kept. Edges from
-   unchanged lines are kept only when they point at other changed code, so the graph stays about the
-   change. DI registrations (`AddScoped<IFoo, Foo>()`) become `registers` edges to `Foo`.
-3. **Interfaces and overrides.** A changed implementation is linked from the interface or base
-   member it implements (`implemented by`), because that is what callers actually call. A call that
-   lands on an interface with exactly one implementation is followed to it.
-4. **Callers.** `SymbolFinder.FindReferencesAsync` finds who calls each changed method, directly or
-   through its interface. Up to 3 unchanged callers are added as context, entry points first, then
-   1 test.
-5. **Back to an entry point.** Unchanged callers are walked up to 3 more hops until an entry point
-   is found: controller actions (with the route built from `[Route]` and `[Http*]` templates),
-   minimal API handlers (`MapGet` and friends), `Main` and top-level statements, `BackgroundService`,
-   `IHostedService`, MediatR/MassTransit/NServiceBus-style handlers, Azure Functions and tests.
-6. **Checks.** Each changed unit gets deterministic review checks:
-   - compiler warnings and errors on added lines (e.g. CS4014, an un-awaited task)
-   - signature changed: which call sites were not touched by the PR
-   - constructor changed in a DI-registered class: is every injected type registered?
-   - new `throw`s, and whether callers in the graph catch them
-   - other implementations of the same interface member the PR did not change
-   - new methods nothing calls yet
-   - whether any test reaches the code within 3 calls, and whether that test changed in the PR
-7. **Story and layout.** A depth-first walk starts at the entry points that reach the most changed
-   code and follows calls in source order, the way you'd step through it in a debugger. That order
-   numbers the steps. Small supporting changes (a new property, an interface signature, a constructor
-   that only assigns fields) ride along with the step that uses them. Columns are call depth
-   (longest path over the acyclic part of the call graph); data cards sit one column after their
-   first reader. Every sort uses ordinal string comparison on file path and line, which is what
-   makes the output reproducible.
+1. **Diff to cards.** `git diff --unified=0` against the merge base gives the exact lines added and
+   removed. Each line goes to the smallest piece of code around it: a method, constructor, property,
+   field, a type (only for changes outside its members), or a file's top-level statements. Removed
+   lines go to the code around the gap they left.
+2. **Arrows.** In each changed card, every call, `new` and use of other changed data is resolved to
+   the real code it points at.
+3. **Interfaces.** A changed class is linked from the interface or base member it implements, because
+   that is what callers really call. If an interface has only one implementation, a call to it is
+   followed to that implementation.
+4. **Callers.** `SymbolFinder.FindReferencesAsync` finds who calls each changed method. Up to 3
+   unchanged callers are added as context: entry points first, then 1 test.
+5. **Back to an entry point.** Unchanged callers are walked up 3 more steps until an entry point is
+   found:
+   - controller actions (with the route built from `[Route]` and `[Http*]`)
+   - minimal API handlers (`MapGet` and friends)
+   - `Main` and top-level statements
+   - `BackgroundService` and `IHostedService`
+   - MediatR, MassTransit and NServiceBus style handlers
+   - Azure Functions
+   - tests
+6. **Checks.** Each changed card gets these checks:
+   - compiler warnings and errors on added lines (for example CS4014, a task that is not awaited)
+   - signature changed: which call sites the PR did not touch
+   - constructor changed in a DI class: is every injected type registered?
+   - new `throw`s, and whether the callers in the graph catch them
+   - other implementations of the same interface member that the PR did not change
+   - new methods that nothing calls yet
+   - whether a test reaches the code within 3 calls, and whether that test changed in the PR
+7. **Story and layout.** The walk starts at the entry points that reach the most changed code. It
+   follows calls in source order, like a debugger. That order gives the step numbers. Small helper
+   changes (a new property, an interface signature, a constructor that only sets fields) join the
+   step that uses them. Columns are call depth. Data cards sit one column after the first card that
+   reads them. All sorting is by file path and line, so the output is always the same.
 
 ## Known limits
 
-- Reflection, `dynamic`, string-based dispatch and source-generated code are invisible to static
-  analysis, so those connections will be missing.
-- In `--source-only` mode, members of types from NuGet packages don't resolve. Edges between your
-  own code still work.
-- Story text is template-based. It describes structure accurately but doesn't explain intent. An
-  LLM narration pass could be layered on top of the JSON without touching the graph itself.
-- Very large PRs produce large graphs. Use the step view and the context toggle.
+- Reflection, `dynamic`, string-based dispatch and source-generated code are invisible, so those
+  connections are missing.
+- In `--source-only` mode, members of NuGet types do not resolve.
+- The story text is built from templates. It describes the structure, not the intent. An LLM could
+  add a narration on top of the JSON without changing the graph.
 
 ## Files
 
-- `src/ReviewGraph/GitDiff.cs`: git invocation and zero-context diff parsing
-- `src/ReviewGraph/Loader.cs`: MSBuildWorkspace loading with a source-only fallback
-- `src/ReviewGraph/Analyzer.cs`: units, edges, entry points, checks, ordering, layout, steps
-- `src/ReviewGraph/Model.cs`: the JSON contract
-- `src/ReviewGraph/viewer.html`: the viewer, embedded into the tool and filled with the JSON
+- `src/ReviewGraph/GitDiff.cs`: runs git and reads the diff
+- `src/ReviewGraph/Loader.cs`: loads the solution with MSBuild, with a source-only fallback
+- `src/ReviewGraph/Analyzer.cs`: cards, arrows, entry points, checks, order, layout, steps
+- `src/ReviewGraph/Model.cs`: the JSON format
+- `src/ReviewGraph/viewer.html`: the viewer, put inside the tool and filled with the JSON
 - `samples/sample-shop`: an ASP.NET Core repo with a `feature/coupons` branch to try it on
