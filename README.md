@@ -47,7 +47,19 @@ The result is always the same: the same repo, base and head give the exact same 
 
 Very large PRs make large graphs. Use the step view and the context toggle to cut them down.
 
+## Install
+
+```bash
+dotnet tool install -g reviewgraph
+reviewgraph path/to/repo --base main --out review.html
+```
+
+Update with `dotnet tool update -g reviewgraph`. Check the version with `reviewgraph --version`.
+The package targets .NET 8 and .NET 10; `dotnet tool install` picks the one that matches your SDK.
+
 ## Run it
+
+From source:
 
 ```bash
 # from the PR branch, with the solution restored (dotnet restore)
@@ -82,6 +94,17 @@ into it with **Open JSON**.
 - uses: actions/upload-artifact@v4
   with: { name: review-graph, path: review.html }
 ```
+
+### Releasing
+
+The version lives in `src/ReviewGraph/ReviewGraph.csproj` (`<Version>`). To publish:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The `release` workflow packs the tag as version `0.2.0` and pushes it to nuget.org
+(needs the `NUGET_API_KEY` secret). To pack by hand: `dotnet pack src/ReviewGraph -c Release`.
 
 ## How it works
 

@@ -15,6 +15,7 @@ public sealed class Options
     public string? Json { get; set; }
     public string? Title { get; set; }
     public bool SourceOnly { get; set; }
+    public bool ShowVersion { get; set; }
 
     public const string Usage = """
         reviewgraph – turn a C# pull request into a storyline graph for reviewers
@@ -31,6 +32,7 @@ public sealed class Options
           --out <file.html>    Self-contained viewer page to write (default: review.html).
           --json <file.json>   Also write the raw graph JSON.
           --title <text>       PR title (default: subject of the latest commit).
+          --version            Print the version and exit.
           --source-only        Skip MSBuild and compile the .cs files directly. Faster, works
                                without a restore, but types from NuGet packages go unresolved.
         """;
@@ -44,6 +46,7 @@ public sealed class Options
             switch (args[i])
             {
                 case "-h" or "--help": return null;
+                case "--version": o.ShowVersion = true; break;
                 case "--base": o.Base = Next(); break;
                 case "--head": o.Head = Next(); break;
                 case "--solution": o.Solution = Path.GetFullPath(Next()); break;
@@ -64,12 +67,17 @@ public sealed class Options
 
 public static class Program
 {
+    static string VersionText() =>
+        (Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown")
+        .Split('+')[0];
+
     public static async Task<int> Main(string[] args)
     {
         try
         {
             var o = Options.Parse(args);
             if (o is null) { Console.WriteLine(Options.Usage); return 0; }
+            if (o.ShowVersion) { Console.WriteLine(VersionText()); return 0; }
             if (!o.SourceOnly) RegisterMsBuild();
             return await RunAsync(o);
         }

@@ -2,13 +2,30 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ReviewGraph</RootNamespace>
     <AssemblyName>reviewgraph</AssemblyName>
     <!-- Deterministic builds: same input, same binary. -->
     <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!-- dotnet tool: dotnet tool install -g reviewgraph -->
+  <PropertyGroup>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>reviewgraph</ToolCommandName>
+    <PackageId>reviewgraph</PackageId>
+    <!-- The release version. CI overrides it from the tag: dotnet pack -p:Version=1.2.3 -->
+    <Version>0.1.0</Version>
+    <Authors>tommy</Authors>
+    <Description>Turns a C# pull request into a storyline graph: changed methods as cards, calls as arrows, entry point to data.</Description>
+    <PackageTags>code-review;pull-request;roslyn;graph;dotnet-tool</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/toch24/review-graph</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/toch24/review-graph</PackageProjectUrl>
   </PropertyGroup>
 
   <!--
@@ -37,6 +54,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
     <EmbeddedResource Include="viewer.html" LogicalName="viewer.html" />
   </ItemGroup>
 

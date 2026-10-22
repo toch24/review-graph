@@ -1,0 +1,19 @@
+name: release
+
+# Push a tag like v0.2.0 to publish that version to nuget.org.
+# Needs a NUGET_API_KEY repository secret.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "8.0.x\n10.0.x" }
+      - name: Pack
+        run: dotnet pack src/ReviewGraph -c Release -p:Version=${GITHUB_REF_NAME#v} -o out
+      - name: Push
+        run: dotnet nuget push out/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
