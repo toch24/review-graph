@@ -1,0 +1,6 @@
+{
+  "name": "review-graph-viewer-tests",
+  "private": true,
+  "scripts": { "test": "node --test --test-concurrency=1 viewer.test.cjs" },
+  "devDependencies": { "playwright": "^1.56.1" }
+}
