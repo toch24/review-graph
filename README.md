@@ -49,22 +49,34 @@ Very large PRs make large graphs. Use the step view and the context toggle to cu
 
 ## Install
 
+Install it as a .NET tool:
+
 ```bash
 dotnet tool install -g reviewgraph
-reviewgraph path/to/repo --base main --out review.html
 ```
 
 Update with `dotnet tool update -g reviewgraph`. Check the version with `reviewgraph --version`.
 The package targets .NET 8 and .NET 10; `dotnet tool install` picks the one that matches your SDK.
 
+You can also skip the install and run it from source (see below).
+
 ## Run it
 
-From source:
+Check out the PR branch first. The tool reads the working tree.
+
+**With the installed tool:**
 
 ```bash
-# from the PR branch, with the solution restored (dotnet restore)
+reviewgraph path/to/repo --base main --out review.html --json review.json
+```
+
+**From source** (fork or clone this repo, then restore the solution with `dotnet restore`):
+
+```bash
 dotnet run --project src/ReviewGraph -c Release -- path/to/repo --base main --out review.html --json review.json
 ```
+
+Options:
 
 | Option | Meaning |
 |---|---|
